@@ -3,6 +3,7 @@ import numpy as np
 import mne
 import pandas as pd
 import pickle
+from time import time
 from scipy.stats import chi2
 import sys
 sys.path.append(".")
@@ -10,7 +11,7 @@ from utils import utils, correlation
 from torus_graph_model.model import *
 
 # load human eeg data series from PlosComp journal
-FILE_NAME= "03-2010-anest 20100211 142.021.set"
+FILE_NAME= "03-2010-anest 20100211 142.003.set"
 PATH_TO_DATA_DIR = "../../data/Sedation-RestingState/"
 PATH_TO_DATA = PATH_TO_DATA_DIR + FILE_NAME
 
@@ -30,10 +31,12 @@ def get_instantaneous_phase(signal, start, end, verbose=False):
 loaded_eeg = load_human_eeg(
     PATH_TO_DATA)
 raw_eeg = loaded_eeg.get_data()  # (39, 91, 2500)
+raw_eeg = raw_eeg[:,:,:500]
+print("Data shape:", raw_eeg.shape)
 
 
 data_df = pd.DataFrame()
-epoch = 0
+epoch = 0 # choose which epoch
 start = 10 #Hz
 end = 15 #Hz
 
@@ -54,11 +57,33 @@ print("="*10)
 #Torus graph modelling
 
 ### save to pickle. #TODO: needs acceleration by parallel or numpy. this computation takes time.
-# est, Gamma_zero, Gamma_zero_inv, H_zero, V_zero = estimate_phi(data_arr)
-# Sigma_zero = Gamma_zero_inv@V_zero@Gamma_zero_inv
-# score_matching_results = {"est":est, "Gamma_zero":Gamma_zero, "Gamma_zero_inv":Gamma_zero_inv, "H_zero":H_zero, "V_zero":V_zero,"Sigma_zero":Sigma_zero}
-# with open(f"pickles/"+FILE_NAME, mode="wb") as f:
-#     pickle.dump(score_matching_results, f)
+start = time()
+
+est, Gamma_zero, Gamma_zero_inv, H_zero, V_zero = estimate_phi(data_arr) # 2 seconds x N (num of frames)
+print("calculating ... ")
+
+###With jit
+# from numba import jit
+# @jit
+# def Num_NpDot(a, b):
+#     return np.dot(a, b)
+# @jit
+# def DAD(A,B,C):
+#     return Num_NpDot(Num_NpDot(A,B),C)
+
+# Sigma_zero = DAD(Gamma_zero_inv,V_zero,Gamma_zero_inv)
+
+###Without jit
+Sigma_zero = Gamma_zero_inv@V_zero@Gamma_zero_inv
+
+score_matching_results = {"est":est, "Gamma_zero":Gamma_zero, "Gamma_zero_inv":Gamma_zero_inv, "H_zero":H_zero, "V_zero":V_zero,"Sigma_zero":Sigma_zero}
+with open(f"pickles/"+FILE_NAME, mode="wb") as f:
+    pickle.dump(score_matching_results, f)
+end = time()
+print("="*10)
+print("Parameter estimation took", end-start, "seconds.")
+print("="*10)
+
 
 ### load from pickle
 with open("pickles/"+FILE_NAME.replace(".set",".pkl"), mode="rb") as g:  
