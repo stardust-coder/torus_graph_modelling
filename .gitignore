@@ -1,0 +1,5 @@
+output/*.npy
+output/*.png
+pickles/*.pkl
+.DS_Store
+*/__pycache__
