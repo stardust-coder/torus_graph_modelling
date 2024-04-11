@@ -10,51 +10,23 @@ sys.path.append(".")
 from utils import utils, correlation
 from torus_graph_model.model import *
 
-# load human eeg data series from PlosComp journal
-FILE_NAME= "03-2010-anest 20100211 142.003.set"
-PATH_TO_DATA_DIR = "../../data/Sedation-RestingState/"
-PATH_TO_DATA = PATH_TO_DATA_DIR + FILE_NAME
+import argparse    # 1. argparseをインポート
 
-def load_human_eeg(input_fname, events=None):
-    data = mne.io.read_epochs_eeglab(
-        input_fname, verbose=False, montage_units="cm")
-    return data
+parser = argparse.ArgumentParser()
+parser.add_argument('file_name', help='PATH TO YOUR CSV FILE') 
+parser.add_argument('--phase', help='Is your data circular data defined on [0,2π)?', action='store_true') 
+args = parser.parse_args()  
 
-
-def get_instantaneous_phase(signal, start, end, verbose=False):
-    '''get instantaneous phase'''
-    signal = utils.get_bandpass(signal, start, end)
-    _, _, phase, _ = utils.hilbert_transform(signal=signal, verbose=verbose)
-    return phase
-
-
-loaded_eeg = load_human_eeg(
-    PATH_TO_DATA)
-raw_eeg = loaded_eeg.get_data()  # (39, 91, 2500)
-raw_eeg = raw_eeg[:,:,:500]
-print("Data shape:", raw_eeg.shape)
-
-
-data_df = pd.DataFrame()
-epoch = 0 # choose which epoch
-start = 10 #Hz
-end = 15 #Hz
-
-for dim in range(1, 92):  # 91 dimensional timeseries
-    data_df[f"X{dim}"] = get_instantaneous_phase(
-        raw_eeg[epoch][dim-1], start=start, end=end)  # 2500frames, sampling=250Hz => 10 seconds
-data_arr = data_df.to_numpy()
+data_df = pd.read_csv(args.file_name,header=None)
+if args.phase:
+    data_arr = data_df.to_numpy()
+if not args.phase:
+    data_df = data_df.apply(lambda x:utils.hilbert_transform(x.tolist())[2],axis=0)
+    data_arr = data_df.to_numpy()
 
 print("="*10)
 print("Data shape",data_arr.shape) #shape:(N,d)
 print("="*10)
-
-#1. Simple Correlation Matrix
-
-#correlation.data_to_corr_map(data_arr,utils.PLV)
-#correlation.data_to_corr_map(data_arr,utils.PLI)
-
-#2. Torus graph modelling
 
 ### save to pickle. #TODO: needs acceleration by parallel or numpy. this computation takes time.
 start = time()

@@ -1,0 +1,6 @@
+mne
+pandas
+numpy
+matplotlib
+scipy
+pymatreader
