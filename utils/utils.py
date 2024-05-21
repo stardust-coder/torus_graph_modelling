@@ -63,3 +63,19 @@ def hilbert_transform(signal, dt=1e-4, verbose=False):
                  label="envelope")  # envelope
         plt.legend()
     return z, env, phase_inst, freq_inst
+
+import matplotlib.animation as animation
+def series_to_gif(data,output_path):
+    '''
+    data : numpy array (d,n)
+    '''
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ims = []
+    for i in range(data.shape[0]):
+        im = ax.plot(data[i])
+        ax.set_title(f"electrode #{i+1}")
+        ims.append(im)
+    ani = animation.ArtistAnimation(fig,ims,interval=100,blit=True,repeat_delay=1000)
+    ani.save(output_path,writer="pillow")
+

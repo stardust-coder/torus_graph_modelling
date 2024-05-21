@@ -1,5 +1,6 @@
-output/*.npy
-output/*.png
-pickles/*.pkl
+output
+pickles
+data
 .DS_Store
 */__pycache__
+*.log

@@ -1,7 +1,9 @@
+import cupy as cp
 import numpy as np
 import itertools
 from tqdm import tqdm
-
+from time import time
+import pdb
 
 def S1_j(x):
     '''
@@ -92,9 +94,45 @@ def Gamma(x):
     return D(x)@D(x).T
 
 
+#lasso with cordinate descent
+
+def estimate_phi_lasso(data, l):
+    n, d = data.shape
+    Gamma_hat = np.zeros((2*d*d, 2*d*d))
+    H_hat = np.zeros((2*d*d, 1))
+    V_zero_hat = np.zeros((2*d*d, 2*d*d))
+
+    ###時間かかる. なぜ？
+    for ind in tqdm(range(n), desc='Estimating Phi', leave=False):
+        x = data[ind]
+        Gamma_hat = Gamma_hat + Gamma(x)
+        tmp_ = H(x)
+        H_hat = H_hat + tmp_
+        V_zero_hat = V_zero_hat + tmp_@tmp_.T
+    Gamma_hat = Gamma_hat/n
+    H_hat = H_hat/n
+    V_zero_hat = V_zero_hat/n
+
+    #phi_tmp = estimate_phi(data)[0] #computationally costly
+    
+    phi_tmp = np.zeros((2*d*d,1))
+    LAMBDA = l
+    for _ in range(1000):
+        print(phi_tmp)
+        for j in range(2*d*d):
+            if phi_tmp[j][0] > 0:
+                phi_tmp[j][0] = (-(Gamma_hat[j,:]@phi_tmp - Gamma_hat[j][j]*phi_tmp[j][0].item()) + H_hat[j][0] - LAMBDA)/Gamma_hat[j][j]
+            else:
+                phi_tmp[j][0] = (-(Gamma_hat[j,:]@phi_tmp - Gamma_hat[j][j]*phi_tmp[j][0].item()) + H_hat[j][0] + LAMBDA)/Gamma_hat[j][j]        
+        
+    return phi_tmp
+
+
 def estimate_phi(data):
     '''data : n x d'''
     n, d = data.shape
+
+    #pattern1
     Gamma_hat = np.zeros((2*d*d, 2*d*d))
     H_hat = np.zeros((2*d*d, 1))
     V_zero_hat = np.zeros((2*d*d, 2*d*d))
@@ -105,8 +143,59 @@ def estimate_phi(data):
         tmp_ = H(x)
         H_hat = H_hat + tmp_
         V_zero_hat = V_zero_hat + tmp_@tmp_.T
-
     Gamma_hat = Gamma_hat/n
+    H_hat = H_hat/n
+    V_zero_hat = V_zero_hat/n
+    Gamma_hat_inv = np.linalg.inv(Gamma_hat)
+
+    return Gamma_hat_inv@H_hat, Gamma_hat, Gamma_hat_inv, H_hat, V_zero_hat
+
+    #pattern2
+    # A = []
+    # Gammas = []
+    # for ind in tqdm(range(n), desc='Estimating Phi', leave=False):
+    #     x = data[ind]
+    #     Gammas.append(Gamma(x))
+    #     tmp_ = H(x)
+    #     A.append(tmp_.T.flatten().tolist())
+    # A = cp.array(A)
+    # V_zero_hat_gpu = cp.dot(A.T,A)
+    # V_zero_hat = cp.asnumpy(V_zero_hat_gpu)
+    # print("A)",time())
+    # Gamma_hat = np.sum(Gammas)
+    # print("B)",time())
+    # Gamma_hat = Gamma_hat/n
+    # H_hat = H_hat/n
+    # V_zero_hat = V_zero_hat/n
+    # Gamma_hat_inv = np.linalg.inv(Gamma_hat)
+    # print("C)",time())
+    # return Gamma_hat_inv@H_hat, Gamma_hat, Gamma_hat_inv, H_hat, V_zero_hat
+
+
+
+def estimate_phi_numpy(data):
+    '''data : n x d'''
+    n, d = data.shape
+    def Gamma_(x):
+        return np.outer(x, x)
+
+    def estimate_parameters(data):
+        print(time())
+        Gamma_x = [Gamma_(x) for x in data]  # 各xに対するGamma(x)を計算し、配列として保持
+        print(time())
+        #Gamma_hat = np.sum(np.kron(gx, gx) for gx in Gamma_x)
+        Gamma_hat = cp.sum([cp.kron(cp.asarray(gx), cp.asarray(gx)) for gx in Gamma_x])
+        Gamma_hat = cp.asnumpy(Gamma_hat)
+        print(time())
+        H_hat = np.sum(gx.flatten()[:, np.newaxis] for gx in Gamma_x)
+        print(time())
+        V_zero_hat = np.sum(np.outer(gx.flatten(), gx.flatten()) for gx in Gamma_x)
+        print(time())
+
+        return Gamma_hat, H_hat, V_zero_hat
+    
+    Gamma_hat, H_hat, V_zero_hat = estimate_parameters(data)
+    Gaa_hat = Gamma_hat/n
     H_hat = H_hat/n
     V_zero_hat = V_zero_hat/n
     Gamma_hat_inv = np.linalg.inv(Gamma_hat)

@@ -2,13 +2,14 @@ from utils import *
 import matplotlib.pyplot as plt
 import numpy as np
 
-def corr_to_corr_map(mat):
-    plt.imshow(mat,cmap="jet")
-    plt.colorbar()
-    plt.show()
+def corr_to_corr_map(mat,output_path="output/test.png"):
+    im = plt.imshow(mat,cmap="jet")
+    cb = plt.colorbar(im)
+    plt.savefig(output_path)
+    cb.remove() 
 
 
-def data_to_corr_map(data, metric):
+def data_to_corr_map(data, metric,output_path="output/correlation.png"):
     '''
     data : (t,d)
     metric : function that takes two values and return one float
@@ -28,4 +29,4 @@ def data_to_corr_map(data, metric):
     corr_list = np.array(corr_list)
     plt.imshow(corr_list,cmap="jet")
     plt.colorbar()
-    plt.show()
+    plt.savefig(output_path)

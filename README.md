@@ -31,7 +31,17 @@ python scripts/inference.py <path_to_your_csv> --phase #if it is already a circu
 ```
 # take around 2 hours with 91 dimensional EEG data
 python script/analysis_human_eeg.py
+
+# lasso version
+python script/analysis_human_eeg_lasso.py
 ```
+*About this data*
+1. baseline
+2. mild
+3. moderate
+4. recover
+
+
 
 ### Example Usage
 
