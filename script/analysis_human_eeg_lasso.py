@@ -9,20 +9,25 @@ import sys
 sys.path.append(".")
 from utils import utils, correlation
 from torus_graph_model.model import *
-#from torus_graph_model.model_cuda import * #実装失敗
 import json
+import os
 import pdb
 
-exp_num = 21
-import os
+# filenames and suffix from EEG data(Chennu et al., 2016)
+ind_list = {3:["003","008","021","026"],5:["004","009","022","027"],6:["003","008","013","026"],7:["003","008","021","027"],8:["004","010","015","028"],10:["005","010","015","028"],14:["011","016","031"],26:["003","008","013","026"]}
+FILE_NAME_LIST = {3:"03-2010-anest 20100211 142.",5:"05-2010-anest 20100223 095.",6:"06-2010-anest 20100224 093.",7:"07-2010-anest 20100226 133.",8:"08-2010-anest 20100301 095.",10:"10-2010-anest 20100305 130.",14:"14-2010-anest 20100324 132.",26:"26-2010-anest 20100507 132."}
+
+
+exp_num = 1
+patient_id = 26 #prefix of file names
 os.makedirs(f"output/{exp_num}/")
 os.makedirs(f"pickles/{exp_num}/")
 
 def main(id):
     start_time = time()
     # load human eeg data series from PlosComp journal
-    FILE_NAME= f"29-2010-anest 20100921 142.{id}"
-    PATH_TO_DATA_DIR = "data/Sedation-RestingState/"
+    FILE_NAME= f"{FILE_NAME_LIST[patient_id]}{id}"
+    PATH_TO_DATA_DIR = "../../data/Sedation-RestingState/"
     PATH_TO_DATA = PATH_TO_DATA_DIR + FILE_NAME + ".set"
 
     def load_human_eeg(input_fname, events=None):
@@ -48,9 +53,9 @@ def main(id):
 
     data_df = pd.DataFrame()
     epoch = 0 # choose which epoch
-    freq_bottom = 14 #Hz
-    freq_top = 30 #Hz
-    utils.series_to_gif(raw_eeg[epoch],output_path=f"output/{exp_num}/data.gif") #raw dataを可視化
+    freq_bottom = 8 #Hz
+    freq_top = 14 #Hz
+    #utils.series_to_gif(raw_eeg[epoch],output_path=f"output/{exp_num}/data.gif") #raw dataを可視化
 
     num_electrodes = 91
     for dim in range(1, num_electrodes+1):  # 91 dimensional timeseries
@@ -58,67 +63,45 @@ def main(id):
             raw_eeg[epoch][dim-1], start=freq_bottom, end=freq_top)  # 2500frames, sampling=250Hz => 10 seconds
     data_arr = data_df.to_numpy()
 
+   
+    #select 10 or 19 main electrodes 
+    montage = loaded_eeg.get_montage()    
+    main_electrodes = []
+    #for item in ["Fp1","Fp2","F3","F4","C3","C4","P3","P4","O1","O2"]:
+    for item in ["Fp1","Fp2","F3","F4","C3","C4","P3","P4","O1","O2","F7","F8","T3","T4","T5","T6","Fz","Pz","Cz"]:
+        main_electrodes.append(montage.ch_names.index(item))
+    
+    print("Index of selected electrodes(0~d)",len(main_electrodes),main_electrodes)
+    data_arr = data_arr[:,main_electrodes] #main electrodes
+
     print("="*10)
     print("Data shape",data_arr.shape) #shape:(N,d)
     print("="*10)
 
     #1. Simple Correlation Matrix
-
-    correlation.data_to_corr_map(data_arr,utils.PLV,f"output/{exp_num}/"+FILE_NAME+"_PLV.png")
-    plt.clf()
-    correlation.data_to_corr_map(data_arr,utils.PLI,f"output/{exp_num}/"+FILE_NAME+"_PLI.png")
-    plt.clf()
+    # correlation.data_to_corr_map(data_arr,utils.PLV,f"output/{exp_num}/"+FILE_NAME+"_PLV.png")
+    # plt.clf()
+    # correlation.data_to_corr_map(data_arr,utils.PLI,f"output/{exp_num}/"+FILE_NAME+"_PLI.png")
+    # plt.clf()
 
     #2. Torus graph modelling
     temp_time = time()
-    ### save to pickle. 
     LAMBDA = 0.5
-    est = estimate_phi_lasso(data_arr, LAMBDA) # 2 seconds x N (num of frames)
-
-    score_matching_results = {"est":est}
-    with open(f"pickles/{exp_num}/"+FILE_NAME+".pkl", mode="wb") as f:
-        pickle.dump(score_matching_results, f)
+    est_dict = estimate_phi_lasso(data_arr, LAMBDA) # 2 seconds x N (num of frames)
     
     print("="*10)
     print("Parameter estimation took", time()-temp_time, "seconds.")
     print("="*10)
 
+    print(est_dict)
 
-    ### load from pickle
-    with open(f"pickles/{exp_num}/"+FILE_NAME+".pkl", mode="rb") as g:  
-        score_matching_results = pickle.load(g)
-        est = score_matching_results["est"]
-
-    n,d = data_arr.shape #n ; sample size, d : dimension
-    ls = [] #matrix of test stats
-    adj_mat = np.zeros((d,d)) #adjancy matrix of final network
-    l = [i for i in range(1, d+1)]
-    ind_list = [v for v in itertools.combinations(l, 2)]
+    with open(f"pickles/{exp_num}/"+FILE_NAME+".pkl", mode="wb") as f:
+        pickle.dump(est_dict, f)
     
-    for i in range(d):
-        tmp_ = []
-        for j in range(d):
-            if i==j:
-                val = 0
-            else:
-                ind_ = ind_list.index((min(i+1,j+1), max(i+1,j+1)))
-                phi_est = est[2*d+4*ind_:2*d+4*(ind_+1)]
-                val = np.linalg.norm(phi_est)
-            tmp_.append(val)
-            if val > 30:
-                adj_mat[i][j]=1
-        ls.append(tmp_)
+    ### load from pickle
+    #with open(f"pickles/{exp_num}/"+FILE_NAME+".pkl", mode="rb") as g:  
+    #    est_dict = pickle.load(g)
 
-    end_time = time()
-    ###
-    corr_mat = np.array(ls)
-    #np.fill_diagonal(corr_mat, np.max(corr_mat))
-
-    np.save(f"output/{exp_num}/{id}_test_stats_matrix",corr_mat)
-    np.save(f"output/{exp_num}/{id}_adjancy_matrix",adj_mat)
-
-    correlation.corr_to_corr_map(corr_mat,f"output/{exp_num}/{id}_test_stats_matrix.png")
-    correlation.corr_to_corr_map(adj_mat,f"output/{exp_num}/{id}_adjancy_matrix.png")
 
 
 
@@ -129,8 +112,9 @@ def main(id):
                     "freq_top":freq_top,
                     "epoch":epoch,
                     "num_electrodes":num_electrodes,
-                    "total_computation_time":end_time-start_time,
-                    "lambda": LAMBDA
+                    "electrodes" : main_electrodes,
+                    "lambda": LAMBDA,
+                    "filename": FILE_NAME
                     }
         json.dump(dic, c, indent=2)
 
@@ -144,8 +128,9 @@ def main(id):
     print(f"Saved correlation matrix and result to output/{exp_num}/")
     print("="*10)
 
+    print(time()-start_time, "seconds")
+
 if __name__=="__main__":
-    main("005")
-    main("010")
-    main("023")
-    main("028")
+    for y in ind_list[patient_id]:
+        main(y)
+    
