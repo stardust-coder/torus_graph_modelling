@@ -4,4 +4,6 @@ data
 .DS_Store
 */__pycache__
 *.log
+*.png
 script/old
+model/old
