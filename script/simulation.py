@@ -8,11 +8,12 @@ import mne
 import pickle
 from scipy.stats import chi2
 import sys
+import json
 
 sys.path.append(".")
 from utils import utils, correlation
-from torus_graph_model.model import *
-import json
+from model.model import *
+
 
 
 def S1_j(x):
@@ -187,29 +188,26 @@ def torus_graph_density(phi, x1, x2):
 
 if __name__ == "__main__":
     # true_phi = np.array([[1,0,1,0,0,0,0,0]]).T
+    # true_phi = np.array([[1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0]]).T
     true_phi = np.array([[1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0]]).T
+
 
     losses = []
     times = []
     from tqdm import tqdm
 
-    LAMBDA = 1
-    for _ in tqdm(range(1)):
+    for _ in tqdm(range(3)):
         data_arr, acc = sample_from_torus_graph(1000, 3, true_phi, False)
         start_time = time()
-        est = estimate_phi_lasso(data_arr, l=LAMBDA)
-        # est_dicts_admm_path, lambda_admm_path = estimate_phi_admm_path(data_arr)
+        # est = estimate_phi_naive(data_arr)
+        # est = estimate_phi(data_arr)
+        est = estimate_phi_admm(data_arr,l=0.1)
 
+        pdb.set_trace()
+        # est_dicts_admm_path, lambda_admm_path = estimate_phi_admm_path(data_arr)
         end_time = time()
+        
         times.append(end_time - start_time)
         losses.append(np.linalg.norm(true_phi[10:14, :] - est[8:12, :]).item())  # RMSE
     print("RMSE:", sum(losses) / len(losses))
-    # print("total time:", end_time-start_time, " seconds")
     print("per time:", sum(times) / len(times), " seconds")
-    print(true_phi)
-    print(est)
-
-    # plt.hist(losses)
-    # plt.savefig("rmse_dist.png")
-
-    # pdb.set_trace()

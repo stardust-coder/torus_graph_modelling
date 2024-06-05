@@ -29,14 +29,13 @@ python scripts/inference.py <path_to_your_csv> --phase #if it is already a circu
 
 ### Use human EEG data from [Chennu et al., 2016](https://www.repository.cam.ac.uk/items/b7817912-50b5-423b-882e-978fb39a49df)
 ```
-# take around 2 hours with 91 dimensional EEG data
-python script/analysis_human_eeg.py
+python script/score_matching.py #naive matrix inversion or conditional models
+python script/score_matching_admmpath.py #ADMM with regularization path and SMIC minimization
 
-# conditional model and lasso version
-python script/analysis_human_eeg_lasso.py
 
 # confirmation using simulation data
 python script/simulation.py
+
 ```
 
 #### About this data
