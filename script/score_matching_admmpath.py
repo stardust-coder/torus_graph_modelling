@@ -16,8 +16,8 @@ from model.model import *
 import constant
 
 # File Settings
-exp_num = 3
-patient_id = 3  # prefix of file names
+exp_num = 26
+patient_id = 26  # prefix of file names
 is_simulation = False
 if exp_num != 0:
     os.makedirs(f"output/{exp_num}/")
@@ -106,77 +106,119 @@ def main(id):
     plt.clf()
 
     # 2. Torus graph modelling
-    est_dict_admm_path, lambda_admm_path = estimate_phi_admm_path(data_arr)
+    est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path(data_arr)
     est_dict_full = estimate_phi(data_arr)
+    print("lambda:",lambda_admm_path)
 
-    import copy
-    def get_est_for_SMIC(j):  # lasso推定値→edge pattern→SM推定値を計算
-        # est_tmp = copy.deepcopy(est_dict_full)
-        # edge_list = []
-        # est = est_dict_admm_path[j]
-        # num_of_zeros = 0
-        # for k, v in est.items():
-        #     if np.linalg.norm(v) <= 1e-2 and 0 not in k:
-        #         est_tmp[k] = np.zeros((4, 1))
-        #         num_of_zeros += 1
-        #     if np.linalg.norm(v) > 1e-2 and 0 not in k:
-        #         edge_list.append(k)
-        # return est_tmp, edge_list
+    def dict_to_arr(est_d):
+        return np.concatenate([x[1] for x in sorted(est_d.items())])
 
-        edge_list = []
-        edge_list_c = []
-        est = est_dict_admm_path[j]
-        for k, v in est.items():
-            if np.linalg.norm(v) > 1e-2 and 0 not in k:
-                edge_list.append(k)
-            if np.linalg.norm(v) <= 1e-2 and 0 not in k:
-                edge_list_c.append(k)
-        est_tmp = estimate_phi(data_arr, invalid_edges=edge_list_c)
-        return est_tmp, edge_list
-
-
-    def get_SMIC(est):
-        est_vec = [x[1] for x in sorted(est.items())]
-        est_vec = np.concatenate(est_vec)
-
-        I = np.zeros((2 * d * d, 2 * d * d))
-        Gamma_hat = np.zeros((2 * d * d, 2 * d * d))
-        H_hat = np.zeros((2 * d * d, 1))
-        for j in tqdm(range(N), desc="Calculating I in SMIC", leave=False):
+    est_arrs = []
+    scores = []
+    for j in range(len(zero_indices)):
+        est_arr = dict_to_arr(est_dict_full)
+        ind_ = non_zero_indices[j]
+        est_arr[zero_indices[j]] = 0
+        est_arrs.append(est_arr)
+        
+        I = np.zeros((len(ind_),len(ind_)))
+        Gamma_hat = np.zeros((len(ind_),len(ind_)))
+        H_hat = np.zeros((len(ind_), 1))
+        for j in tqdm(range(N), desc="Calculating G,H,I in SMIC", leave=False):
             x = data_arr[j]
-            G_ = Gamma(x)
+            G_ = Gamma(x)[np.ix_(ind_,ind_)]
             Gamma_hat = Gamma_hat + G_
-            H_ = H(x)
+            H_ = H(x)[ind_]
             H_hat = H_hat + H_
-            tmp = G_ @ est_vec - H_
+            tmp = G_ @ est_arr[ind_] - H_
             I = I + tmp @ tmp.T
         I = I / N
         Gamma_hat = Gamma_hat/N
         H_hat = H_hat/N
-
-        smic_val1 = N * (
-            est_vec.T @ Gamma_hat @ est_vec - 2 * (est_vec.T @ H_hat)
-        ) 
-        smic_val2 = np.trace(I @ np.linalg.inv(Gamma_hat))
-        smic_val = smic_val1 + smic_val2
-        print(smic_val1.item(),"+",smic_val2,"=",smic_val)
-        return smic_val.item()
-
-    edges = []
-    scores = []
-    est_dicts = []
-    for j in range(len(est_dict_admm_path)):
-        print(f"Preparing {j} th result of the path...")
-        est_, edge = get_est_for_SMIC(j)
-        
-        smic = get_SMIC(est_)
+        smic1 = N*(-est_arr[ind_].T@H_hat) 
+        smic1 = smic1.item()
+        smic2 = np.trace(I@np.linalg.inv(Gamma_hat))
+        smic = smic1 + smic2
+        print(smic1,"+",smic2,"=",smic)
         scores.append(smic)
-        edges.append(edge)
-        est_dicts.append(est_)
-    edge_nums = [len(e) for e in edges]
+
+
+    # for j in range(len(est_dict_admm_path)):
+    #     print(f"Preparing {j} th result of the path...")
+    #     zero_indices = 
+
+    
+    # est_dict_full = estimate_phi(data_arr)
+    # import copy
+    # def get_est_for_SMIC(j):  # lasso推定値→edge pattern→SM推定値を計算
+    #     est_tmp = copy.deepcopy(est_dict_full)
+    #     edge_list = []
+    #     est = est_dict_admm_path[j]
+    #     num_of_zeros = 0
+    #     for k, v in est.items():
+    #         if np.linalg.norm(v) <= 1e-2 and 0 not in k:
+    #             est_tmp[k] = np.zeros((4, 1))
+    #             num_of_zeros += 1
+    #         if np.linalg.norm(v) > 1e-2 and 0 not in k:
+    #             edge_list.append(k)
+    #     return est_tmp, edge_list
+
+    #     # edge_list = []
+    #     # edge_list_c = []
+    #     # est = est_dict_admm_path[j]
+    #     # for k, v in est.items():
+    #     #     if np.linalg.norm(v) > 1e-2 and 0 not in k:
+    #     #         edge_list.append(k)
+    #     #     if np.linalg.norm(v) <= 1e-2 and 0 not in k:
+    #     #         edge_list_c.append(k)
+    #     # est_tmp = estimate_phi(data_arr, invalid_edges=edge_list_c)
+    #     # return est_tmp, edge_list
+
+
+    # def get_SMIC(est):
+    #     est_vec = [x[1] for x in sorted(est.items())]
+    #     est_vec = np.concatenate(est_vec)
+
+    #     I = np.zeros((2 * d * d, 2 * d * d))
+    #     Gamma_hat = np.zeros((2 * d * d, 2 * d * d))
+    #     H_hat = np.zeros((2 * d * d, 1))
+    #     for j in tqdm(range(N), desc="Calculating I in SMIC", leave=False):
+    #         x = data_arr[j]
+    #         G_ = Gamma(x)
+    #         Gamma_hat = Gamma_hat + G_
+    #         H_ = H(x)
+    #         H_hat = H_hat + H_
+    #         tmp = G_ @ est_vec - H_
+    #         I = I + tmp @ tmp.T
+    #     I = I / N
+    #     Gamma_hat = Gamma_hat/N
+    #     H_hat = H_hat/N
+
+    #     smic_val1 = N * (
+    #         est_vec.T @ Gamma_hat @ est_vec - 2 * (est_vec.T @ H_hat)
+    #     ) 
+    #     smic_val1 = smic_val1.item()
+    #     smic_val2 = np.trace(I @ np.linalg.inv(Gamma_hat))
+    #     smic_val = smic_val1 + smic_val2
+    #     print(smic_val1,"+",smic_val2,"=",smic_val)
+    #     return smic_val.item()
+
+    # edges = []
+    # scores = []
+    # est_dicts = []
+    # for j in range(len(est_dict_admm_path)):
+    #     print(f"Preparing {j} th result of the path...")
+    #     est_, edge = get_est_for_SMIC(j)
+    #     smic = get_SMIC(est_)
+    #     scores.append(smic)
+    #     edges.append(edge)
+    #     est_dicts.append(est_) 
+    
+    
+    num_edges = [len(e) for e in edges]
     optimal_id = scores.index(min(scores))
-    print(scores[optimal_id], edge_nums[optimal_id], edges[optimal_id])
-    plt.plot(edge_nums, scores)
+    print(scores[optimal_id], num_edges[optimal_id], edges[optimal_id])
+    plt.plot(num_edges, scores)
     plt.savefig(f"output/{exp_num}/" + FILE_NAME + "_fig1.png")
     plt.clf()
     plt.plot(lambda_admm_path, scores)
@@ -185,12 +227,11 @@ def main(id):
     plt.clf()
 
     if not is_simulation:
-
         with open(f"pickles/{exp_num}/" + FILE_NAME + "_path.pkl", mode="wb") as f:
-            pickle.dump(est_dicts, f)
+            pickle.dump(est_dict_admm_path, f)
 
         with open(f"pickles/{exp_num}/" + FILE_NAME + "_best.pkl", mode="wb") as f:
-            pickle.dump(est_dicts[optimal_id], f)  # save best result
+            pickle.dump(est_dict_admm_path[optimal_id], f)  # save best result
 
         with open(f"output/{exp_num}/{id}_config.json", "w") as c:
             dic = {
@@ -213,3 +254,4 @@ def main(id):
 if __name__ == "__main__":
     for y in ind_list[patient_id]:
         main(y)
+        print("Time:",y,time())

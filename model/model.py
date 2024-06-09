@@ -190,6 +190,7 @@ def estimate_phi(data,invalid_edges=[]):
             res_dict[0, t[0]] = est_p[:2]
             res_dict[0, t[1]] = est_p[2:4]
             res_dict[t] = est_p[2 * 2 + 4 * (ind) : 2 * 2 + 4 * (ind + 1)]
+
     return res_dict  # dictで返す. (node a, node b)のkeyで推定値がvalue.
 
 
@@ -327,6 +328,9 @@ def estimate_phi_admm_path(data):
 
     ind_list = list(itertools.combinations(range(1, d + 1), 2))
     res = [{} for _ in range(30)]
+    indices = [[] for _ in range(30)]
+    indices_c = [[] for _ in range(30)]
+    edges = [[] for _ in range(30)]
     for i, t in tqdm(enumerate(ind_list)):
         tmp = [x for x in ind_list if t[0] in list(x) or t[1] in list(x)]
         tmp.sort()
@@ -336,7 +340,19 @@ def estimate_phi_admm_path(data):
             res[j][0, t[0]] = est_p[j][:2]
             res[j][0, t[1]] = est_p[j][2:4]
             res[j][t[0], t[1]] = est_p[j][2 * 2 + 4 * (ind) : 2 * 2 + 4 * (ind + 1)]
-    return res, lambda_list
+            thresh = 1e-5
+            if np.linalg.norm(est_p[j][2 * 2 + 4 * (ind) : 2 * 2 + 4 * (ind + 1)]) < thresh:
+                indices[j].append(2*d+4*i)
+                indices[j].append(2*d+4*i+1)
+                indices[j].append(2*d+4*i+2)
+                indices[j].append(2*d+4*i+3)
+            else:
+                indices_c[j].append(2*d+4*i)
+                indices_c[j].append(2*d+4*i+1)
+                indices_c[j].append(2*d+4*i+2)
+                indices_c[j].append(2*d+4*i+3)
+                edges[j].append(t)
+    return res, indices, indices_c, edges, lambda_list
 
 
 

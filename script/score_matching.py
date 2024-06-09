@@ -18,8 +18,8 @@ import constant
 
 
 # File Settings
-exp_num = 3
-patient_id = 3  # prefix of file names
+exp_num = 29
+patient_id = 29  # prefix of file names
 is_simulation = False
 if exp_num != 0:
     os.makedirs(f"output/{exp_num}/")
@@ -45,7 +45,7 @@ def main(id):
     else:
         # load human eeg data series from PlosComp journal
         FILE_NAME = f"{FILE_NAME_LIST[patient_id]}{id}"
-        PATH_TO_DATA_DIR = "../../data/Sedation-RestingState/"
+        PATH_TO_DATA_DIR = "../data/Sedation-RestingState/"
         PATH_TO_DATA = PATH_TO_DATA_DIR + FILE_NAME + ".set"
 
         def load_human_eeg(input_fname, events=None):
@@ -106,12 +106,11 @@ def main(id):
 
     # 2. Torus graph modelling
     #est_dict= estimate_phi_naive(data_arr)
-    est_mat, est_dict= estimate_phi(data_arr)
+    #est_dict= estimate_phi(data_arr)
+    est_dict= estimate_phi_admm(data_arr,l=0.5)
 
     if not is_simulation:
-        with open(f"pickles/{exp_num}/" + FILE_NAME + "_mat.pkl", mode="wb") as f:
-            pickle.dump(est_mat, f) 
-            
+       
         with open(f"pickles/{exp_num}/" + FILE_NAME + "_dict.pkl", mode="wb") as f:
             pickle.dump(est_dict, f)  # save one result
 
@@ -136,3 +135,4 @@ def main(id):
 if __name__ == "__main__":
     for y in ind_list[patient_id]:
         main(y)
+        print("Time:",y,time())
