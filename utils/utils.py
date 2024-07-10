@@ -1,15 +1,14 @@
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
-
+import pdb
 
 def PLI(sig1, sig2, fs=500):
-    # phase_dif = sig1-sig2 #使ってない
-    f, Pxy = scipy.signal.csd(sig1, sig2, fs)  # 疑惑
-    phase = np.angle(Pxy)
-    pli = np.where(phase > 0, 1, -1)
-    pli = np.where(pli == 0, 0, pli)
-    return np.abs(np.mean(pli))
+    phase_dif = sig1-sig2 #使ってない
+    # f, Pxy_csd = scipy.signal.csd(sig1, sig2, fs)  
+    pli = np.sign(np.sin(phase_dif))
+    pli = np.abs(np.mean(pli))
+    return pli 
 
 
 def PLV(sig1, sig2):

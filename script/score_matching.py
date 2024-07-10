@@ -18,8 +18,8 @@ import constant
 
 
 # File Settings
-exp_num = 29
-patient_id = 29  # prefix of file names
+exp_num = 22
+patient_id = 22  # prefix of file names
 is_simulation = False
 if exp_num != 0:
     os.makedirs(f"output/{exp_num}/")

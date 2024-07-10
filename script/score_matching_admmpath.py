@@ -9,6 +9,7 @@ import sys
 import json
 import os
 import pdb
+import random
 
 sys.path.append(".")
 from utils import utils, correlation
@@ -16,8 +17,8 @@ from model.model import *
 import constant
 
 # File Settings
-exp_num = 26
-patient_id = 26  # prefix of file names
+exp_num = 5
+patient_id = 5 # prefix of file names
 is_simulation = False
 if exp_num != 0:
     os.makedirs(f"output/{exp_num}/")
@@ -30,15 +31,16 @@ def main(id):
 
     if is_simulation:
         from simulation import sample_from_torus_graph
-        import random
         FILE_NAME = "SIMULATION"
-        print("Sampling might takes time ....")
+        print("Running simulation...")
         true_phi = np.zeros((50,1))
-        true_phi[14:18,:] = 0.3 #(1,3)に対応
-        true_phi[18:22,:] = 0.3 #(1,4)に対応
-        true_phi[30:34,:] = 0.3 #(2,4)に対応
-        true_phi[34:38,:] = 0.3 #(2,5)に対応
-    
+        true_phi[0:10,:] = 0.0 #
+        true_phi[14:18,:] = 0.2 #(1,3)に対応
+        true_phi[18:22,:] = 0.2 #(1,4)に対応
+        true_phi[30:34,:] = 0.2 #(2,4)に対応
+        true_phi[34:38,:] = 0.2 #(2,5)に対応
+        true_phi[42:46,:] = 0.2 #(3,5)に対応
+        print("True parameter:")
         print(len(true_phi)) 
         print(true_phi.T)
         data_arr, acc = sample_from_torus_graph(1000, 5, true_phi, False)
@@ -81,18 +83,20 @@ def main(id):
             )  # 2500frames, sampling=250Hz => 10 seconds
         data_arr = data_df.to_numpy()
 
-        # select 10 or 19 main electrodes
+        # select 19 or or 91 electrodes
         montage = loaded_eeg.get_montage()
         main_electrodes = []
-        # for item in ["Fp1", "Fp2", "F3", "F4"]:
-        # for item in ["Fp1", "Fp2", "F3", "F4", "C3", "C4", "P3", "P4", "O1", "O2"]:
-        for item in ["Fp1","Fp2","F3","F4","C3","C4","P3","P4","O1","O2","F7","F8","T3","T4","T5","T6","Fz","Pz","Cz",]:
+        # for item in ["Fp1","Fp2","F3","F4","C3"]:
+        # for item in ["Fp1","Fp2","F3","F4","C3","C4","P3","P4","O1","O2","F7","F8","T3","T4","T5","T6","Fz","Pz","Cz"]: #10-20system
+        for item in ["Fp1","E15","Fp2","E26","E23","E16","E3","E2","F7","E27","F3","E19","Fz","E4","F4","E123","F8","E39","E35","E29","E13","E6","E112","E111","E110","E115","T3","E47","E37","E31","Cz","E80","E87","E98","T4","E50","P3","E53","E54","E55","E79","E86","P4","E101","T5","E59","E60","E67","Pz","E77","E85","E91","T6","E65","E66","E72","E84","E90","O1","Oz","O2"]: #10-10system
+        # for item in ['C3', 'C4', 'Cz', 'E10', 'E101', 'E102', 'E103', 'E105', 'E106', 'E109', 'E110', 'E111', 'E112', 'E115', 'E116', 'E117', 'E118', 'E12', 'E123', 'E13', 'E15', 'E16', 'E18', 'E19', 'E2', 'E20', 'E23', 'E26', 'E27', 'E28', 'E29', 'E3', 'E30', 'E31', 'E34', 'E35', 'E37', 'E39', 'E4', 'E40', 'E41', 'E42', 'E46', 'E47', 'E5', 'E50', 'E51', 'E53', 'E54', 'E55', 'E59', 'E6', 'E60', 'E61', 'E65', 'E66', 'E67', 'E7', 'E71', 'E72', 'E76', 'E77', 'E78', 'E79', 'E80', 'E84', 'E85', 'E86', 'E87', 'E90', 'E91', 'E93', 'E97', 'E98', 'F3', 'F4', 'F7', 'F8', 'Fp1', 'Fp2', 'Fz', 'O1', 'O2', 'Oz', 'P3', 'P4', 'Pz', 'T3', 'T4', 'T5', 'T6']: #all 91 electrodes
             main_electrodes.append(montage.ch_names.index(item))
-
+        
         print(
             "Index of selected electrodes(0~d)", len(main_electrodes), main_electrodes
         )
-        data_arr = data_arr[:, main_electrodes]  # main electrodes
+        data_arr = data_arr[500:1000, main_electrodes]  # main electrodes
+        
 
     N, d = data_arr.shape
     print("=" * 10)
@@ -106,8 +110,8 @@ def main(id):
     plt.clf()
 
     # 2. Torus graph modelling
-    est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path(data_arr)
-    est_dict_full = estimate_phi(data_arr)
+    est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path_pool(data_arr)
+    est_dict_full = estimate_phi(data_arr) #maybe need correction 
     print("lambda:",lambda_admm_path)
 
     def dict_to_arr(est_d):
@@ -115,7 +119,7 @@ def main(id):
 
     est_arrs = []
     scores = []
-    for j in range(len(zero_indices)):
+    for j in range(len(lambda_admm_path)):
         est_arr = dict_to_arr(est_dict_full)
         ind_ = non_zero_indices[j]
         est_arr[zero_indices[j]] = 0
@@ -141,79 +145,6 @@ def main(id):
         smic = smic1 + smic2
         print(smic1,"+",smic2,"=",smic)
         scores.append(smic)
-
-
-    # for j in range(len(est_dict_admm_path)):
-    #     print(f"Preparing {j} th result of the path...")
-    #     zero_indices = 
-
-    
-    # est_dict_full = estimate_phi(data_arr)
-    # import copy
-    # def get_est_for_SMIC(j):  # lasso推定値→edge pattern→SM推定値を計算
-    #     est_tmp = copy.deepcopy(est_dict_full)
-    #     edge_list = []
-    #     est = est_dict_admm_path[j]
-    #     num_of_zeros = 0
-    #     for k, v in est.items():
-    #         if np.linalg.norm(v) <= 1e-2 and 0 not in k:
-    #             est_tmp[k] = np.zeros((4, 1))
-    #             num_of_zeros += 1
-    #         if np.linalg.norm(v) > 1e-2 and 0 not in k:
-    #             edge_list.append(k)
-    #     return est_tmp, edge_list
-
-    #     # edge_list = []
-    #     # edge_list_c = []
-    #     # est = est_dict_admm_path[j]
-    #     # for k, v in est.items():
-    #     #     if np.linalg.norm(v) > 1e-2 and 0 not in k:
-    #     #         edge_list.append(k)
-    #     #     if np.linalg.norm(v) <= 1e-2 and 0 not in k:
-    #     #         edge_list_c.append(k)
-    #     # est_tmp = estimate_phi(data_arr, invalid_edges=edge_list_c)
-    #     # return est_tmp, edge_list
-
-
-    # def get_SMIC(est):
-    #     est_vec = [x[1] for x in sorted(est.items())]
-    #     est_vec = np.concatenate(est_vec)
-
-    #     I = np.zeros((2 * d * d, 2 * d * d))
-    #     Gamma_hat = np.zeros((2 * d * d, 2 * d * d))
-    #     H_hat = np.zeros((2 * d * d, 1))
-    #     for j in tqdm(range(N), desc="Calculating I in SMIC", leave=False):
-    #         x = data_arr[j]
-    #         G_ = Gamma(x)
-    #         Gamma_hat = Gamma_hat + G_
-    #         H_ = H(x)
-    #         H_hat = H_hat + H_
-    #         tmp = G_ @ est_vec - H_
-    #         I = I + tmp @ tmp.T
-    #     I = I / N
-    #     Gamma_hat = Gamma_hat/N
-    #     H_hat = H_hat/N
-
-    #     smic_val1 = N * (
-    #         est_vec.T @ Gamma_hat @ est_vec - 2 * (est_vec.T @ H_hat)
-    #     ) 
-    #     smic_val1 = smic_val1.item()
-    #     smic_val2 = np.trace(I @ np.linalg.inv(Gamma_hat))
-    #     smic_val = smic_val1 + smic_val2
-    #     print(smic_val1,"+",smic_val2,"=",smic_val)
-    #     return smic_val.item()
-
-    # edges = []
-    # scores = []
-    # est_dicts = []
-    # for j in range(len(est_dict_admm_path)):
-    #     print(f"Preparing {j} th result of the path...")
-    #     est_, edge = get_est_for_SMIC(j)
-    #     smic = get_SMIC(est_)
-    #     scores.append(smic)
-    #     edges.append(edge)
-    #     est_dicts.append(est_) 
-    
     
     num_edges = [len(e) for e in edges]
     optimal_id = scores.index(min(scores))
@@ -232,6 +163,9 @@ def main(id):
 
         with open(f"pickles/{exp_num}/" + FILE_NAME + "_best.pkl", mode="wb") as f:
             pickle.dump(est_dict_admm_path[optimal_id], f)  # save best result
+        
+        with open(f"pickles/{exp_num}/" + FILE_NAME + "_smic.pkl", mode="wb") as f:
+            pickle.dump(scores, f)  # save smic
 
         with open(f"output/{exp_num}/{id}_config.json", "w") as c:
             dic = {
@@ -249,7 +183,18 @@ def main(id):
     
     if is_simulation:
         pdb.set_trace()
+        print(num_edges)
+        print(edges)
+        print(scores)
 
+    # constuct a graph
+    import networkx as nx
+    G = nx.Graph()
+    G.add_edges_from(edges[optimal_id])
+    print(G)
+    print("Average clustering coefficient = ", nx.average_clustering(G))
+    print("Average shortest path length = ", nx.average_shortest_path_length(G))
+    print("Small-world index = ", nx.sigma(G),nx.omega(G))
 
 if __name__ == "__main__":
     for y in ind_list[patient_id]:
