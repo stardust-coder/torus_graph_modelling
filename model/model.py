@@ -6,6 +6,7 @@ from time import time
 from time import sleep
 from multiprocess import Pool
 import pdb
+from parfor import parfor
 
 
 def S1_j(x):
@@ -459,7 +460,7 @@ def estimate_phi_admm_path_pool(data):
         print("processed.")
         return res, indices, indices_c, edges
     
-    with Pool(64) as p:
+    with Pool(100) as p:
         response = p.starmap(process, list(enumerate(ind_list)))
 
     print(time())
@@ -483,6 +484,142 @@ def estimate_phi_admm_path_pool(data):
         edges.append(edges_)
     print(time())
     return res, indices, indices_c, edges, lambda_list
+
+#parforを用いた並列化の実装
+def estimate_phi_parfor(data):
+    print(time())
+    n, d = data.shape
+    ind_list = list(itertools.combinations(range(1, d + 1), 2))
+    
+    @parfor(ind_list)
+    def est_partial(T):
+        a, b = T
+        index = get_indices(d,a,b)
+        # Gamma_hat = np.zeros((2 * d * d, 2 * d * d))
+        Gamma_hat_small = np.zeros((8 * (d - 1), 8 * (d - 1)))
+        H_hat = np.zeros((2 * d * d, 1))
+        for j in range(n):
+            x = data[j]
+            D_small = D(x)[index, :]
+            # Gamma_hat = Gamma_hat + Gamma(x)
+            Gamma_hat_small = Gamma_hat_small + D_small @ D_small.T
+            tmp_ = H(x)
+            H_hat = H_hat + tmp_
+        # Gamma_hat = Gamma_hat / n
+        Gamma_hat_small = Gamma_hat_small / n
+        H_hat = H_hat / n
+        est_without_lasso = np.linalg.inv(Gamma_hat_small) @ H_hat[index]
+        return est_without_lasso
+
+    response = est_partial #response[e][l]は8(d-1)次元ベクトル
+
+    res = {}
+    for j,item in enumerate(response):
+        a,b = ind_list[j] #a < b
+        tmp = [x for x in ind_list if a in list(x) or b in list(x)]
+        ind = tmp.index((a,b))
+        res[0, a] = item[0:2]
+        res[0, b] = item[2:4]
+        res[a, b] = item[2 * 2 + 4 * (ind) : 2 * 2 + 4 * (ind + 1)]
+    print(time())
+    return res
+
+def estimate_phi_admm_path_parfor(data):
+    print(time())
+    n, d = data.shape
+    lambda_list = np.logspace(-2, 1, num=30).tolist()
+    ind_list = list(itertools.combinations(range(1, d + 1), 2))
+    res = [{} for _ in range(30)]
+    indices = [[] for _ in range(30)]
+    indices_c = [[] for _ in range(30)]
+    edges = [[] for _ in range(30)]
+    
+    @parfor(ind_list)
+    def est_partial(T):
+        a,b = T
+        index = get_indices(d, a, b)
+        Gamma_hat_small = np.zeros((8 * (d - 1), 8 * (d - 1)))
+        H_hat = np.zeros((2 * d * d, 1))
+        for ind in range(n): ###ここのnが長い...
+            x = data[ind]
+            D_small = D(x)[index, :]
+            Gamma_hat_small = Gamma_hat_small + D_small @ D_small.T
+            tmp_ = H(x)
+            H_hat = H_hat + tmp_
+            print(ind)
+        Gamma_hat_small = Gamma_hat_small / n
+        H_hat = H_hat / n
+
+        # ADMMでlassoを実行
+        def soft_threshold(param, t_vec):
+            res = np.zeros(t_vec.shape)
+            for i, t in enumerate(t_vec.flatten().tolist()):
+                if t > param:
+                    res[i][0] = t - param
+                elif t < -param:
+                    res[i][0] = t + param
+                else:
+                    res[i][0] = 0
+            return res
+
+        d_ = 8 * (d - 1)
+        x_admm = np.zeros((d_, 1))  # warm start
+        z_admm = np.zeros((d_, 1))
+        u_admm = np.zeros((d_, 1))
+        k = 0
+        mu = 1  # hyperparameter
+        INV = np.linalg.inv(mu * np.identity(d_) + Gamma_hat_small)
+
+        est_list = []
+
+        for l in lambda_list:
+            k += 1
+            iter_ = 1# 1ならapproxiamte, 大きく設定したほうがexactに近い
+            for _ in range(iter_):
+                x_new = INV @ (mu * (z_admm - u_admm) + H_hat[index])
+                x_dif = np.linalg.norm(x_new - x_admm)
+                z_new = soft_threshold(l / mu, x_new + u_admm)
+                z_dif = np.linalg.norm(z_new - z_admm)
+                r_dif = np.linalg.norm(x_new - z_new)
+                u_new = u_admm + x_new - z_new
+                x_admm = x_new.copy()
+                z_admm = z_new.copy()
+                u_admm = u_new.copy()
+                if r_dif < 1e-4 and z_dif < 1e-4:
+                    break
+            est_with_admm_onestep = z_admm.copy()
+            est_list.append(est_with_admm_onestep)
+        return est_list
+
+    response = est_partial #response[e][l]は8(d-1)次元ベクトル
+
+    res = [{} for _ in range(len(lambda_list))]
+    indices = [[] for _ in range(len(lambda_list))]
+    indices_c = [[] for _ in range(len(lambda_list))]
+    edges = [[] for _ in range(len(lambda_list))]
+    for i in range(len(lambda_list)):
+        for j,item in enumerate(response):
+            a,b = ind_list[j] #a < b
+            tmp = [x for x in ind_list if a in list(x) or b in list(x)]
+            ind = tmp.index((a,b))
+            res[i][0, a] = item[i][0:2]
+            res[i][0, b] = item[i][2:4]
+            res[i][a, b] = item[i][2 * 2 + 4 * (ind) : 2 * 2 + 4 * (ind + 1)]
+            thresh = 1e-5
+            if np.linalg.norm(item[i][2 * 2 + 4 * (ind) : 2 * 2 + 4 * (ind + 1)]) < thresh:
+                indices[i].append(2*d+4*j)
+                indices[i].append(2*d+4*j+1)
+                indices[i].append(2*d+4*j+2)
+                indices[i].append(2*d+4*j+3)
+            else:
+                indices_c[i].append(2*d+4*j)
+                indices_c[i].append(2*d+4*j+1)
+                indices_c[i].append(2*d+4*j+2)
+                indices_c[i].append(2*d+4*j+3)
+                edges[i].append((a,b))
+        
+    print(time())
+    return res, indices, indices_c, edges, lambda_list #indicesが0成分, indices_cが非0成分に対応
 
 def test_for_one_edge(N, d, est, a, b, sigma, verbose=False):
     """

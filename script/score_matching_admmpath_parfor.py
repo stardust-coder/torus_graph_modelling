@@ -11,6 +11,7 @@ import json
 import os
 import pdb
 import random
+from parfor import parfor
 
 sys.path.append(".")
 from utils import utils, correlation
@@ -120,76 +121,67 @@ def main(id):
     def dict_to_arr(est_d):
         return np.concatenate([x[1] for x in sorted(est_d.items())])
 
-    est_arrs = []
-    scores = []
+    # @parfor(range(len(lambda_admm_path)))
+    # def calc_SMIC_1(j):
+    #     est_arr = dict_to_arr(est_dict_full)
+    #     ind_ = non_zero_indices[j]
+    #     est_arr[zero_indices[j]] = 0
+        
+    #     I = np.zeros((len(ind_),len(ind_)))
+    #     Gamma_hat = np.zeros((len(ind_),len(ind_)))
+    #     H_hat = np.zeros((len(ind_), 1))
+    #     for j in range(N):
+    #         x = data_arr[j]
+    #         G_ = Gamma(x)[np.ix_(ind_,ind_)]
+    #         Gamma_hat = Gamma_hat + G_
+    #         H_ = H(x)[ind_]
+    #         H_hat = H_hat + H_
+    #         tmp = G_ @ est_arr[ind_] - H_
+    #         I = I + tmp @ tmp.T
+    #     I = I / N
+    #     Gamma_hat = Gamma_hat/N
+    #     H_hat = H_hat/N
+    #     smic1 = N*(-est_arr[ind_].T@H_hat) 
+    #     smic1 = smic1.item()
 
-    def calc_SMIC_1():
-        for j in range(len(lambda_admm_path)):
-            est_arr = dict_to_arr(est_dict_full)
-            ind_ = non_zero_indices[j]
-            est_arr[zero_indices[j]] = 0
-            est_arrs.append(est_arr)
-            
-            I = np.zeros((len(ind_),len(ind_)))
-            Gamma_hat = np.zeros((len(ind_),len(ind_)))
-            H_hat = np.zeros((len(ind_), 1))
-            for j in tqdm(range(N), desc="Calculating G,H,I in SMIC", leave=False):
-                x = data_arr[j]
-                G_ = Gamma(x)[np.ix_(ind_,ind_)]
-                Gamma_hat = Gamma_hat + G_
-                H_ = H(x)[ind_]
-                H_hat = H_hat + H_
-                tmp = G_ @ est_arr[ind_] - H_
-                I = I + tmp @ tmp.T
-            I = I / N
-            Gamma_hat = Gamma_hat/N
-            H_hat = H_hat/N
-            smic1 = N*(-est_arr[ind_].T@H_hat)  #plugged-in optimal estimator to quaratic form
-            smic1 = smic1.item()
+        
+    #     eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
+    #     smic2 = sum(eigvals)
+    #     # smic2 = np.trace(I@np.linalg.inv(Gamma_hat))
+        
+    #     smic = smic1 + smic2
+    #     return smic
 
-            if I.shape == (0,0):
-                smic2 = 0
-            else:
-                eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
-                smic2 = sum(eigvals)
-            # smic2 = np.trace(I@np.linalg.inv(Gamma_hat))
-            smic = smic1 + smic2
-            print(smic1,"+",smic2,"=",smic)
-            scores.append(smic)
-
-    def calc_SMIC_2():
-        for j in range(len(lambda_admm_path)):
-            est_arr = dict_to_arr(est_dict_full)
-            ind_ = non_zero_indices[j]
-            est_arr[zero_indices[j]] = 0
-            est_arrs.append(est_arr)
-            
-            I = np.zeros((2*(d**2),2*(d**2)))
-            Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
-            H_hat = np.zeros((2*(d**2), 1))
-            for j in tqdm(range(N), desc="Calculating G,H,I in SMIC", leave=False):
-                x = data_arr[j]
-                G_ = Gamma(x)
-                Gamma_hat = Gamma_hat + G_
-                H_ = H(x)
-                H_hat = H_hat + H_
-                tmp = G_ @ est_arr - H_
-                I = I + tmp @ tmp.T
-            I = I / N
-            Gamma_hat = Gamma_hat/N
-            H_hat = H_hat/N
-            smic1 = N*(-est_arr.T@H_hat)  #plugged-in optimal estimator to quaratic form
-            smic1 = smic1.item()
-
-            eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
-            smic2 = sum(eigvals)
-            
-            smic = smic1 + smic2
-            print(smic1,"+",smic2,"=",smic)
-            scores.append(smic)
+    @parfor(range(len(lambda_admm_path)))
+    def calc_SMIC_2(j):
+        est_arr = dict_to_arr(est_dict_full)
+        ind_ = non_zero_indices[j]
+        est_arr[zero_indices[j]] = 0
     
-    calc_SMIC_2()
+        I = np.zeros((2*(d**2),2*(d**2)))
+        Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
+        H_hat = np.zeros((2*(d**2), 1))
+        for data_ind in range(N):
+            x = data_arr[data_ind]
+            G_ = Gamma(x)
+            Gamma_hat = Gamma_hat + G_
+            H_ = H(x)
+            H_hat = H_hat + H_
+            tmp = G_ @ est_arr - H_
+            I = I + tmp @ tmp.T
+        I = I / N
+        Gamma_hat = Gamma_hat/N
+        H_hat = H_hat/N
+        smic1 = N*(-est_arr.T@H_hat)  #plugged-in optimal estimator to quaratic form
+        smic1 = smic1.item()
 
+        eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
+        smic2 = sum(eigvals)
+        smic = smic1 + smic2
+        return smic
+
+    scores = calc_SMIC_2
+    
     num_edges = [len(e) for e in edges]
     optimal_id = scores.index(min(scores))
     print(scores[optimal_id], num_edges[optimal_id], edges[optimal_id])

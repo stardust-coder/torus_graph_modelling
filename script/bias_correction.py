@@ -16,10 +16,10 @@ for eps in [0 + 0.01*j for j in range(20)]:
     # generate samples from mixtrue torus graph model
     def sample(N):
         if random.random() > eps:
-            true_phi = np.array([[0,0,0,0,0.1,0.1,0.1,0.1]]).T
+            true_phi = np.array([[0,0,0,0,1,1,1,1]]).T
             data, acc = sample_from_torus_graph(N, 2, true_phi, False)
         else:
-            true_phi = np.array([[0,0,0,0,1,1,1,1]]).T
+            true_phi = np.array([[0,0,0,0,5,5,5,5]]).T
             data, acc = sample_from_torus_graph(N, 2, true_phi, False)
         # print(true_phi.T, acc)
         return data
@@ -43,30 +43,29 @@ for eps in [0 + 0.01*j for j in range(20)]:
 
         
         J_true = 0
-        M = 10000
+        M = 100000
         for _ in range(M):
-            data_ = sample(1)[0]
-            J_true += arr_.T@Gamma(data_)@arr_/2 - arr_.T@H(data_)
+            z = sample(1)[0]
+            J_true += arr_.T@Gamma(z)@arr_/2 - arr_.T@H(z)
         J_true /= M
-
-        return J_emp, J_true
+        return J_emp, J_true #-0.016535077149124004, -0.01563347
 
     def true_bias():
         N = 1000
-        M = 10000
-        B = 0
+        M = 100000
+        B_ = 0
         for _ in tqdm(range(M)):
             data = sample(N)
             J1, J2 = sm_objective_val(data)
-            B += J1 - J2
-        B /= M
-        B = B.item()
-        B = B * N
-        return B
+            B_ += J1 - J2
+        B_ /= M
+        B_ = B_.item()
+        B_ = B_ * 2 * N 
+        return B_
     
     def estimated_bias():
         N = 1000
-        M = 10000
+        M = 100000
         res = []
         for _ in tqdm(range(M)):
             data = sample(N)
@@ -94,8 +93,8 @@ for eps in [0 + 0.01*j for j in range(20)]:
     B_hat_std_list.append(B_hat_std)
 
 
-    B = true_bias()
-    B_list.append(B)
+    B_true_bias = true_bias()
+    B_list.append(B_true_bias)
 
 print(B_hat_list)
 print(B_hat_std_list)
