@@ -142,6 +142,7 @@ def estimate_phi_naive_admm_path(data):
     print(time())
     n, d = data.shape
     lambda_list = np.logspace(-2, 1, num=30).tolist()
+    ind_list = list(itertools.combinations(range(1, d + 1), 2))
 
     Gamma_hat = np.zeros((2 * d * d, 2 * d * d))
     H_hat = np.zeros((2 * d * d, 1))
@@ -173,7 +174,7 @@ def estimate_phi_naive_admm_path(data):
     INV = np.linalg.inv(mu * np.identity(2*d*d) + Gamma_hat)
 
     est_list = []
-
+    res = []
     for l in lambda_list:
         k += 1
         iter_ = 1# 1ならapproxiamte, 大きく設定したほうがexactに近い
@@ -191,6 +192,14 @@ def estimate_phi_naive_admm_path(data):
                 break
         est_with_admm_onestep = z_admm.copy()
         est_list.append(est_with_admm_onestep)
+
+        res_dict = {}
+        res_mat = est_with_admm_onestep
+        for i,t in enumerate(range(1,d+1)):
+            res_dict[(0,t)] = res_mat[2*i:2*(i+1)]
+        for i, t in enumerate(ind_list):
+            res_dict[(t[0], t[1])] = res_mat[2 * d + 4 * (i) : 2 * d + 4 * (i + 1)]
+        res.append(res_dict)
     
     import pdb; pdb.set_trace()
 
