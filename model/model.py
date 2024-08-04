@@ -126,19 +126,65 @@ def estimate_phi_naive(data,verbose=False):
     Gamma_hat_inv = np.linalg.inv(Gamma_hat)
     # print("End.")
     res_mat = Gamma_hat_inv @ H_hat
-    #return res_mat
-
-    res_dict = {}
-    ind_list = list(itertools.combinations(range(1, d + 1), 2))
-    for i,t in enumerate(range(1,d+1)):
-        res_dict[(0,t)] = res_mat[2*i:2*(i+1)]
-    for i, t in tqdm(enumerate(ind_list)):
-        res_dict[(t[0], t[1])] = res_mat[2 * d + 4 * (i) : 2 * d + 4 * (i + 1)]
+    
     if verbose:
-        arr_ = dict_to_arr(res_dict)
-        return arr_
+        return res_mat
     else:
+        res_dict = {}
+        ind_list = list(itertools.combinations(range(1, d + 1), 2))
+        for i,t in enumerate(range(1,d+1)):
+            res_dict[(0,t)] = res_mat[2*i:2*(i+1)]
+        for i, t in enumerate(ind_list):
+            res_dict[(t[0], t[1])] = res_mat[2 * d + 4 * (i) : 2 * d + 4 * (i + 1)]
         return res_dict
+
+def estimate_phi_naive_admm_path(data):
+    print(time())
+    n, d = data.shape
+    lambda_list = np.logspace(-2, 1, num=30).tolist()
+
+    # ADMMでlassoを実行
+    def soft_threshold(param, t_vec):
+        res = np.zeros(t_vec.shape)
+        for i, t in enumerate(t_vec.flatten().tolist()):
+            if t > param:
+                res[i][0] = t - param
+            elif t < -param:
+                res[i][0] = t + param
+            else:
+                res[i][0] = 0
+        return res
+
+    x_admm = np.zeros((d, 1))  # warm start
+    z_admm = np.zeros((d, 1))
+    u_admm = np.zeros((d, 1))
+    k = 0
+    mu = 1  # hyperparameter
+    INV = np.linalg.inv(mu * np.identity(d) + Gamma_hat)
+
+    est_list = []
+
+    for l in lambda_list:
+        k += 1
+        iter_ = 1# 1ならapproxiamte, 大きく設定したほうがexactに近い
+        for _ in range(iter_):
+            x_new = INV @ (mu * (z_admm - u_admm) + H_hat)
+            x_dif = np.linalg.norm(x_new - x_admm)
+            z_new = soft_threshold(l / mu, x_new + u_admm)
+            z_dif = np.linalg.norm(z_new - z_admm)
+            r_dif = np.linalg.norm(x_new - z_new)
+            u_new = u_admm + x_new - z_new
+            x_admm = x_new.copy()
+            z_admm = z_new.copy()
+            u_admm = u_new.copy()
+            if r_dif < 1e-4 and z_dif < 1e-4:
+                break
+        est_with_admm_onestep = z_admm.copy()
+        est_list.append(est_with_admm_onestep)
+    
+    import pdb; pdb.set_trace()
+
+    return res, indices, indices_c, edges, lambda_list
 
 def get_indices(d,a,b):  # a,b: from 1 to d
     node_to_vec = [[] for _ in range(d)]

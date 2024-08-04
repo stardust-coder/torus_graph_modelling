@@ -71,14 +71,14 @@ def torus_graph_density(phi, x1, x2):
 
 
 if __name__ == "__main__":
-    phi = [0, 0, 0, 0, 1, 0, 1, 0]  # model parameters, two peaks
+    phi = [0, 0, 0, 0, 1, 1, 0, 0]  # model parameters, two peaks
     sample, _ = sample_from_torus_graph(
         1000, 2, np.array([phi]).T)
     print("num of samples", len(sample))
     sample = np.array(sample)
     plt.figure(figsize=(5, 5))
-    plt.scatter(sample[:, 0], sample[:, 1])
-    plt.show()
+    # plt.scatter(sample[:, 0], sample[:, 1])
+    # plt.show()
 
     # ground truth
     u = np.linspace(0, 2*np.pi, 100)
@@ -86,5 +86,7 @@ if __name__ == "__main__":
     x, y = np.meshgrid(u, v)
     res = torus_graph_density(phi, x, y)
     res = res/np.sum(res)
+    plt.axis("off")
     plt.imshow(res, cmap='bwr')
     plt.show()
+    plt.savefig("sample.png")

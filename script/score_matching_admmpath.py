@@ -20,7 +20,7 @@ import constant
 # File Settings
 exp_num = 0
 patient_id = 5 # prefix of file names
-is_simulation = False
+is_simulation = True
 if exp_num != 0:
     os.makedirs(f"output/{exp_num}/")
     os.makedirs(f"pickles/{exp_num}/")
@@ -34,17 +34,20 @@ def main(id):
         from simulation import sample_from_torus_graph
         FILE_NAME = "SIMULATION"
         print("Running simulation...")
-        true_phi = np.zeros((50,1))
-        true_phi[0:10,:] = 0.0 #
-        true_phi[14:18,:] = 0.3 #(1,3)に対応
-        true_phi[18:22,:] = 0.3 #(1,4)に対応
-        true_phi[30:34,:] = 0.3 #(2,4)に対応
-        true_phi[34:38,:] = 0.3 #(2,5)に対応
-        true_phi[42:46,:] = 0.3 #(3,5)に対応
+        true_phi = np.zeros((8,1))
+        true_phi[0:4,:] = 0.0 #
+        true_phi[4:6,:] = 1.0 #
+        true_phi[6:8,:] = 0.0 #
+        
         print("True parameter:")
         print(len(true_phi)) 
         print(true_phi.T)
-        data_arr, acc = sample_from_torus_graph(1000, 5, true_phi, False)
+        data_arr, acc = sample_from_torus_graph(1000, 2, true_phi, False)
+
+        plt.figure(figsize=(5,5))
+        plt.scatter(data_arr[:,0],data_arr[:,1])
+        plt.savefig("sample.png")
+        plt.clf()
 
     else:
         # load human eeg data series from PlosComp journal
@@ -111,10 +114,10 @@ def main(id):
     plt.clf()
 
     # 2. Torus graph modelling
-    # est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path(data_arr)
-    est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path_parfor(data_arr) #path自体は実は使わない。
+    est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path(data_arr)
+    # est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path_parfor(data_arr) #path自体は実は使わない。
     
-    est_dict_full = estimate_phi_parfor(data_arr) #maybe need correction 
+    est_dict_full = estimate_phi_naive(data_arr,verbose=True) #maybe need correction 
     print("lambda:",lambda_admm_path)
 
     def dict_to_arr(est_d):
