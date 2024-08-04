@@ -68,8 +68,8 @@ def main(id):
 
         loaded_eeg = load_human_eeg(PATH_TO_DATA)
         raw_eeg = loaded_eeg.get_data()  # (39, 91, 2500)
-        window_start = 0
-        window_end = 2500
+        window_start = 500
+        window_end = 1000
         raw_eeg = raw_eeg[:, :, window_start:window_end]
         print("Data shape:", raw_eeg.shape)
 

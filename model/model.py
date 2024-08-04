@@ -165,12 +165,12 @@ def estimate_phi_naive_admm_path(data):
                 res[i][0] = 0
         return res
 
-    x_admm = np.zeros((d, 1))  # warm start
-    z_admm = np.zeros((d, 1))
-    u_admm = np.zeros((d, 1))
+    x_admm = np.zeros((2*d*d, 1))  # warm start
+    z_admm = np.zeros((2*d*d, 1))
+    u_admm = np.zeros((2*d*d, 1))
     k = 0
     mu = 1  # hyperparameter
-    INV = np.linalg.inv(mu * np.identity(d) + Gamma_hat)
+    INV = np.linalg.inv(mu * np.identity(2*d*d) + Gamma_hat)
 
     est_list = []
 
