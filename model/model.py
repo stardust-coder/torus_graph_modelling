@@ -143,6 +143,16 @@ def estimate_phi_naive_admm_path(data):
     n, d = data.shape
     lambda_list = np.logspace(-2, 1, num=30).tolist()
 
+    Gamma_hat = np.zeros((2 * d * d, 2 * d * d))
+    H_hat = np.zeros((2 * d * d, 1))
+    for j in range(n):
+        x = data[j]
+        Gamma_hat = Gamma_hat + Gamma(x)
+        tmp_ = H(x)
+        H_hat = H_hat + tmp_
+    Gamma_hat = Gamma_hat / n
+    H_hat = H_hat / n
+
     # ADMMでlassoを実行
     def soft_threshold(param, t_vec):
         res = np.zeros(t_vec.shape)
