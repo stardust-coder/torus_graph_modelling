@@ -107,9 +107,12 @@ class Torus_Graph:
         self.param = np.zeros((2*dim*dim,1))
         self.naive_est = np.zeros((2*dim*dim,1))
         self.naive_est_flag = False
+        
 
         self.G = nx.Graph()
         self.G.add_nodes_from([i+1 for i in range(dim)])
+        self.pos = nx.circular_layout(self.G)
+
         self.thresh = 1e-4
         self.index_dictionary = {}
         for i, v in enumerate(list(itertools.combinations(range(1, self.d + 1), 2))):
@@ -166,7 +169,7 @@ class Torus_Graph:
     
         Gamma_hat, H_hat = calc_matrices(data)
         if mode=="naive":
-            self.param = np.linalg.inv(Gamma_hat)@H_hat
+            self.param = np.linalg.solve(Gamma_hat,H_hat) #np.linalg.inv(Gamma_hat)@H_hat 
             self.naive_est = self.param.copy()
             self.naive_est_flag = True
             print(self.param)
@@ -228,12 +231,12 @@ class Torus_Graph:
                     tmp = G_ @ est_arr - H_
                     I = I + tmp @ tmp.T
                 I = I / n
-                Gamma_hat = Gamma_hat/n
+                Gamma_hat = Gamma_hat/n #J_hat in paper
                 H_hat = H_hat/n
                 smic1 = n*(-est_arr.T@H_hat)  #plugged-in optimal estimator to quaratic form
                 smic1 = smic1.item()
                 eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
-                smic2 = sum(eigvals)
+                smic2 = sum(eigvals) ### tr(IJ^-1)
                 smic = smic1 + smic2
                 return smic
 
@@ -254,6 +257,11 @@ class Torus_Graph:
                 else:
                     print(r_new)
                     r_prev = r_new
+            
+            plt.figure(figsize=(10,10))
+            plt.plot([len(x) for x in edge_list],scores)
+            plt.savefig("#edges vs SMIC")
+            plt.clf()
 
         # elif mode=="glasso":
 
@@ -275,15 +283,21 @@ class Torus_Graph:
         print("Average shortest path length = ", nx.average_shortest_path_length(self.G))
         print("Small-world index = ", nx.sigma(self.G),nx.omega(self.G))
 
+    def set_coordinates(self, arr):
+        dic = {}
+        for i in range(1,self.d+1):
+            dic[i] = arr[i]
+        self.pos = dic
+
     def plot(self, weight=False):
         weights = nx.get_edge_attributes(self.G, 'weight').values()
-        pos = nx.circular_layout(self.G)
+        
         plt.figure(figsize=(10,10)) #グラフエリアのサイズ
         cmap=plt.cm.RdBu_r
         if weight:
-            nx.draw_networkx(self.G, pos,node_color = 'w', edge_color = weights, edge_cmap = cmap)
+            nx.draw_networkx(self.G, self.pos,node_color = 'w', edge_color = weights, edge_cmap = cmap)
         else:
-            nx.draw_networkx(self.G, pos,node_color = 'w')
+            nx.draw_networkx(self.G, self.pos,node_color = 'w')
 
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=1))
         sm.set_array([])

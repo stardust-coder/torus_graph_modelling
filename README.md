@@ -7,8 +7,9 @@
 * Note: These models do not handle time series information.
 
 ## Files
-- model 
-    - torus_graph : class
+- model/
+    - model (old)
+    - torus_graph (new) : class
 - output: the results will be saved.
 - utils/
     - utils: preprocessing for neuroscience time series data. 
