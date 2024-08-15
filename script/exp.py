@@ -11,6 +11,7 @@ import json
 import os
 import pdb
 import random
+from constant import get_eeg_filenames, get_electrode_names
 from parfor import parfor
 
 sys.path.append(".")
@@ -25,7 +26,7 @@ is_simulation = False
 # if exp_num != 0:
 #     os.makedirs(f"output/{exp_num}/")
 #     os.makedirs(f"pickles/{exp_num}/")
-ind_list, FILE_NAME_LIST = constant.get_eeg_filenames()
+ind_list, FILE_NAME_LIST = get_eeg_filenames()
 
 
 def main(id):
@@ -45,7 +46,7 @@ def main(id):
         print("True parameter:")
         print(len(true_phi)) 
         print(true_phi.T)
-        data_arr, acc = sample_from_torus_graph(1000, 5, true_phi, False)
+        data_arr, acc = sample_from_torus_graph(10000, 5, true_phi, False)
         
 
     else:
@@ -68,8 +69,8 @@ def main(id):
 
         loaded_eeg = load_human_eeg(PATH_TO_DATA)
         raw_eeg = loaded_eeg.get_data()  # (39, 91, 2500)
-        window_start = 500
-        window_end = 1000
+        window_start = 0
+        window_end = 2500
         raw_eeg = raw_eeg[:, :, window_start:window_end]
         print("Data shape:", raw_eeg.shape)
 
@@ -91,8 +92,10 @@ def main(id):
         main_electrodes = []
         # for item in ["Fp1","Fp2","F3","F4","C3"]:
         # for item in ["Fp1","Fp2","F3","F4","C3","C4","P3","P4","O1","O2","F7","F8","T3","T4","T5","T6","Fz","Pz","Cz"]: #10-20system
-        for item in ["Fp1","E15","Fp2","E26","E23","E16","E3","E2","F7","E27","F3","E19","Fz","E4","F4","E123","F8","E39","E35","E29","E13","E6","E112","E111","E110","E115","T3","E47","E37","E31","Cz","E80","E87","E98","T4","E50","P3","E53","E54","E55","E79","E86","P4","E101","T5","E59","E60","E67","Pz","E77","E85","E91","T6","E65","E66","E72","E84","E90","O1","Oz","O2"]: #10-10system
+        # for item in ["Fp1","E15","Fp2","E26","E23","E16","E3","E2","F7","E27","F3","E19","Fz","E4","F4","E123","F8","E39","E35","E29","E13","E6","E112","E111","E110","E115","T3","E47","E37","E31","Cz","E80","E87","E98","T4","E50","P3","E53","E54","E55","E79","E86","P4","E101","T5","E59","E60","E67","Pz","E77","E85","E91","T6","E65","E66","E72","E84","E90","O1","Oz","O2"]: #10-10system
         # for item in ['C3', 'C4', 'Cz', 'E10', 'E101', 'E102', 'E103', 'E105', 'E106', 'E109', 'E110', 'E111', 'E112', 'E115', 'E116', 'E117', 'E118', 'E12', 'E123', 'E13', 'E15', 'E16', 'E18', 'E19', 'E2', 'E20', 'E23', 'E26', 'E27', 'E28', 'E29', 'E3', 'E30', 'E31', 'E34', 'E35', 'E37', 'E39', 'E4', 'E40', 'E41', 'E42', 'E46', 'E47', 'E5', 'E50', 'E51', 'E53', 'E54', 'E55', 'E59', 'E6', 'E60', 'E61', 'E65', 'E66', 'E67', 'E7', 'E71', 'E72', 'E76', 'E77', 'E78', 'E79', 'E80', 'E84', 'E85', 'E86', 'E87', 'E90', 'E91', 'E93', 'E97', 'E98', 'F3', 'F4', 'F7', 'F8', 'Fp1', 'Fp2', 'Fz', 'O1', 'O2', 'Oz', 'P3', 'P4', 'Pz', 'T3', 'T4', 'T5', 'T6']: #all 91 electrodes
+        
+        for item in get_electrode_names(19):
             main_electrodes.append(montage.ch_names.index(item))
         
         print(
@@ -106,60 +109,23 @@ def main(id):
     print("Data shape", data_arr.shape)  # shape:(N,d)
     print("=" * 10)
 
-    # 1. Simple Correlation Matrix
-    correlation.data_to_corr_map(data_arr,utils.PLV,f"output/{exp_num}/"+FILE_NAME+"_PLV.png")
-    plt.clf()
-    correlation.data_to_corr_map(data_arr,utils.PLI,f"output/{exp_num}/"+FILE_NAME+"_PLI.png")
-    plt.clf()
+    ### 1. Simple Correlation Matrix
+    # correlation.data_to_corr_map(data_arr,utils.PLV,f"output/{exp_num}/"+FILE_NAME+"_PLV.png")
+    # plt.clf()
+    # correlation.data_to_corr_map(data_arr,utils.PLI,f"output/{exp_num}/"+FILE_NAME+"_PLI.png")
+    # plt.clf()
 
-    # 2. Torus graph modelling
-    # est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path(data_arr)
-    est_dict_admm_path, zero_indices, non_zero_indices, edges, lambda_admm_path = estimate_phi_admm_path_parfor(data_arr) #path自体は実は使わない。
+    ### 2. Torus graph modelling
+    est_dict_admm_path, edges, bin_arrs, lambda_admm_path = estimate_phi_naive_admm_path(data_arr) 
+    est_dict_full = estimate_phi_naive(data_arr) 
 
-    
-    est_dict_full = estimate_phi_parfor(data_arr) #maybe need correction 
     print("lambda:",lambda_admm_path)
-
-    def dict_to_arr(est_d):
-        return np.concatenate([x[1] for x in sorted(est_d.items())])
+    # import pdb; pdb.set_trace()
 
     # @parfor(range(len(lambda_admm_path)))
-    def calc_SMIC_1(j):
-        est_arr = dict_to_arr(est_dict_full)
-        ind_ = non_zero_indices[j]
-        est_arr[zero_indices[j]] = 0
-        
-        I = np.zeros((len(ind_),len(ind_)))
-        Gamma_hat = np.zeros((len(ind_),len(ind_)))
-        H_hat = np.zeros((len(ind_), 1))
-        for j in range(N):
-            x = data_arr[j]
-            G_ = Gamma(x)[np.ix_(ind_,ind_)]
-            Gamma_hat = Gamma_hat + G_
-            H_ = H(x)[ind_]
-            H_hat = H_hat + H_
-            tmp = G_ @ est_arr[ind_] - H_
-            I = I + tmp @ tmp.T
-        I = I / N
-        Gamma_hat = Gamma_hat/N
-        H_hat = H_hat/N
-        smic1 = N*(-est_arr[ind_].T@H_hat) 
-        smic1 = smic1.item()
-
-        
-        eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
-        smic2 = sum(eigvals)
-        # smic2 = np.trace(I@np.linalg.inv(Gamma_hat))
-        
-        smic = smic1 + smic2
-        return smic
-
-    # @parfor(range(len(lambda_admm_path)))
-    def calc_SMIC_2(j):
-        est_arr = dict_to_arr(est_dict_full)
-        ind_ = non_zero_indices[j]
-        est_arr[zero_indices[j]] = 0
-    
+    def calc_SMIC(j):
+        est_arr = utils.dict_to_arr(est_dict_full)
+        est_arr = est_arr * bin_arrs[j]
         I = np.zeros((2*(d**2),2*(d**2)))
         Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
         H_hat = np.zeros((2*(d**2), 1))
@@ -182,10 +148,14 @@ def main(id):
         smic = smic1 + smic2
         return smic
 
+    scores = []
+    for j in tqdm(range(30)):
+        scores.append(calc_SMIC(j))
+
+    # scores = calc_SMIC
+    print(scores)
     import pdb; pdb.set_trace()
 
-    scores = calc_SMIC_2
-    
     num_edges = [len(e) for e in edges]
     optimal_id = scores.index(min(scores))
     print(scores[optimal_id], num_edges[optimal_id], edges[optimal_id])

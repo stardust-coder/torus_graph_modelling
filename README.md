@@ -1,18 +1,41 @@
-# EEG,ECoG phase series analysis using Torus Graph / 脳神経データ解析
+# Regularized Score Matching of Torus Graph Model for EEG Phase-connectivity Analysis
 
-Fit torus graph to multivariate circular data and view test statistics under null hypothesis that two nodes are independent. 
+* Previous study (Klein et al.) : Fit torus graph to multivariate circular data and view test statistics under null hypothesis that two nodes are independent. 
 
-Note: This model does not handle time series information.
+* Ours : Regularized score matching of the torus graph model to obtain sparse solutions.
 
+* Note: These models do not handle time series information.
 
 ## Files
-- torus_graph_model/
-    - Torus graph model
+- model 
+    - torus_graph : class
+- output: the results will be saved.
 - utils/
-    - preprocessing for neuroscience time series data. 
-    - visualization of correlation matrix (and its variant)
+    - utils: preprocessing for neuroscience time series data. 
+    - visualize: visualization of correlation matrix (and its variant)
+    - simulation : for simulation studies
+- script
+    - main : 
+    - exp : experiments for our paper
+    - constant : file names and so on.
 
-## Basic Usage
+## Basic Usage (New)
+```python
+import sys
+sys.path.append(".")
+from model.torus_graph import Torus_Graph
+from utils.simulation import sample_from_torus_graph, star_shaped_sample
+import numpy as np       
+
+data_arr = star_shaped_sample(1000)
+M = Torus_Graph(5)
+M.estimate(data_arr,mode="naive")
+# M.estimate(data_arr,mode="lasso") #If you want to use lasso, run it after naive estimation, otherwise it fails.
+M.plot(weight=True)
+```
+
+
+## Basic Usage (Old)
 
 ### Sample from torus graph
 ```
@@ -61,3 +84,9 @@ Score matching estimator using
 
 ### Acknowledgement
 This repository is partly a reimplementation of [Klein et al, 2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full)
+
+
+## TODO 
+- higher dimensional data
+- parfor acceleration with conditional distribution based estimation
+- cupy acceleration

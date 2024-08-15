@@ -122,9 +122,7 @@ def estimate_phi_naive(data,verbose=False):
     Gamma_hat = Gamma_hat / n
     H_hat = H_hat / n
     V_zero_hat = V_zero_hat / n
-    # print(f"Inversion of {2*d*d} x {2*d*d} matrix...")
     Gamma_hat_inv = np.linalg.inv(Gamma_hat)
-    # print("End.")
     res_mat = Gamma_hat_inv @ H_hat
     
     if verbose:
@@ -175,9 +173,11 @@ def estimate_phi_naive_admm_path(data):
 
     est_list = []
     res = []
+    edges = []
+    bin_arrs = []
     for l in lambda_list:
         k += 1
-        iter_ = 1# 1ならapproxiamte, 大きく設定したほうがexactに近い
+        iter_ = 10000# 1ならapproxiamte, 大きく設定したほうがexactに近い
         for _ in range(iter_):
             x_new = INV @ (mu * (z_admm - u_admm) + H_hat)
             x_dif = np.linalg.norm(x_new - x_admm)
@@ -192,18 +192,21 @@ def estimate_phi_naive_admm_path(data):
                 break
         est_with_admm_onestep = z_admm.copy()
         est_list.append(est_with_admm_onestep)
-
-        res_dict = {}
-        res_mat = est_with_admm_onestep
-        for i,t in enumerate(range(1,d+1)):
-            res_dict[(0,t)] = res_mat[2*i:2*(i+1)]
-        for i, t in enumerate(ind_list):
-            res_dict[(t[0], t[1])] = res_mat[2 * d + 4 * (i) : 2 * d + 4 * (i + 1)]
-        res.append(res_dict)
-    
-    import pdb; pdb.set_trace()
-
-    return res, indices, indices_c, edges, lambda_list
+        e_ = []
+        bin_arr = [1 for _ in range(2*d)] + [0 for _ in range(2*d*(d-1))]
+        for pair in range(int(d*(d-1)/2)):
+            vec = est_with_admm_onestep[2*d+4*pair:2*d+4*pair+4]
+            if np.linalg.norm(vec) >= 1e-5:
+                bin_arr[2*d+4*pair] = 1
+                bin_arr[2*d+4*pair+1] = 1
+                bin_arr[2*d+4*pair+2] = 1
+                bin_arr[2*d+4*pair+3] = 1
+                e_.append(ind_list[pair])
+        bin_arr = np.array([bin_arr]).T    
+        bin_arrs.append(bin_arr)
+        edges.append(e_)
+        
+    return est_list, edges, bin_arrs, lambda_list
 
 def get_indices(d,a,b):  # a,b: from 1 to d
     node_to_vec = [[] for _ in range(d)]

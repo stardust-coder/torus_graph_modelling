@@ -78,3 +78,5 @@ def series_to_gif(data,output_path):
     ani = animation.ArtistAnimation(fig,ims,interval=100,blit=True,repeat_delay=1000)
     ani.save(output_path,writer="pillow")
 
+def dict_to_arr(est_d):
+    return np.concatenate([x[1] for x in sorted(est_d.items())])
