@@ -10,6 +10,7 @@
 - model/
     - model (old)
     - torus_graph (new) : class
+    - torus_graph_cupy (new) : accelerated with cupy, only in GPU environment
 - output: the results will be saved.
 - utils/
     - utils: preprocessing for neuroscience time series data. 
@@ -28,13 +29,45 @@ from model.torus_graph import Torus_Graph
 from utils.simulation import sample_from_torus_graph, star_shaped_sample
 import numpy as np       
 
-data_arr = star_shaped_sample(1000)
+data_arr = star_shaped_sample(1000) # 5 dimensional sample from a torus graph
 M = Torus_Graph(5)
 M.estimate(data_arr,mode="naive")
 # M.estimate(data_arr,mode="lasso") #If you want to use lasso, run it after naive estimation, otherwise it fails.
 M.plot(weight=True)
 ```
 
+With Cupy(GPU) acceleration
+```python
+import sys
+sys.path.append(".")
+from model.torus_graph_cupy import Torus_Graph
+from utils.simulation import sample_from_torus_graph, star_shaped_sample
+import numpy as np       
+
+data_arr = star_shaped_sample(1000) # 5 dimensional sample from a torus graph
+M = Torus_Graph(5)
+M.estimate(data_arr,mode="naive")
+M.plot(weight=True)
+```
+
+## Mode
+- lasso : regularization on full parameters equally
+- glasso : regularization on d nodes and on d*(d-1)/2 edges by group
+
+
+## Acknowledgement
+This repository is partly a reimplementation of [Klein et al, 2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full)
+
+
+## TODO 
+- cupy acceleration ☑️ -> torus_graph_cupy.py
+- higher dimensional data
+- parallel acceleration with conditional distribution based estimation in torus_graph
+- parallel acceleration with conditional distribution based estimation in torus_graph_cupy ☑️
+- dataloader for any data
+
+
+---
 
 ## Basic Usage (Old)
 
@@ -82,12 +115,3 @@ Score matching estimator using
 1. Specify `FILE_NAME` to be your target time series data.
 1. run `python torus_graph_model/sample.py` and wait.
 1. check `output/` for results.
-
-### Acknowledgement
-This repository is partly a reimplementation of [Klein et al, 2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full)
-
-
-## TODO 
-- higher dimensional data
-- parfor acceleration with conditional distribution based estimation
-- cupy acceleration

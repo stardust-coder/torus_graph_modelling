@@ -3,3 +3,8 @@ numpy
 matplotlib
 scipy
 pymatreader
+tqdm
+mne
+networkx
+joblib
+cupy

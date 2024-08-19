@@ -27,26 +27,31 @@ def chennu(patient_id,state_id,dim):
 
     
     loaded_eeg = load_human_eeg(PATH_TO_DATA)
-    raw_eeg = loaded_eeg.get_data()  # (39, 91, 2500)
+    raw_eeg = loaded_eeg.get_data()
+    
+
     window_start = 0
     window_end = 2500
     raw_eeg = raw_eeg[:, :, window_start:window_end]
     print("Data shape:", raw_eeg.shape)
 
-    data_df = pd.DataFrame()
-    epoch = 0  # choose which epoch
+    
+    df_list = []
+    epochs = [0,1,2,3,4,5,6,7,8,9]  # choose which epoch
     freq_bottom = 8  # Hz
     freq_top = 14  # Hz
-    # utils.series_to_gif(raw_eeg[epoch],output_path=f"output/{exp_num}/data.gif") #raw dataを可視化
-
     num_electrodes = 91
-    for dim_ in range(1, num_electrodes + 1):  # 91 dimensional timeseries
-        data_df[f"X{dim_}"] = get_instantaneous_phase(
-            raw_eeg[epoch][dim_ - 1], start=freq_bottom, end=freq_top
-        )  # 2500frames, sampling=250Hz => 10 seconds
+    for epoch in epochs:
+        data_df = pd.DataFrame()
+        for dim_ in range(1, num_electrodes + 1):  # 91 dimensional timeseries
+            data_df[f"X{dim_}"] = get_instantaneous_phase(
+                raw_eeg[epoch][dim_ - 1], start=freq_bottom, end=freq_top
+            )  # 2500frames, sampling=250Hz => 10 seconds
+        df_list.append(data_df)
+
+    data_df = pd.concat(df_list)
     data_arr = data_df.to_numpy()
 
-    # select 19 or or 91 electrodes
     montage = loaded_eeg.get_montage()
     main_electrodes = []
     
@@ -79,7 +84,8 @@ def chennu_with_pos(patient_id,state_id,dim):
 
     
     loaded_eeg = load_human_eeg(PATH_TO_DATA)
-    raw_eeg = loaded_eeg.get_data()  # (39, 91, 2500)
+    raw_eeg = loaded_eeg.get_data() 
+    
     window_start = 0
     window_end = 2500
     raw_eeg = raw_eeg[:, :, window_start:window_end]
