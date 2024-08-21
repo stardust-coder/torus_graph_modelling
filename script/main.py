@@ -2,12 +2,15 @@ import sys
 sys.path.append(".")
 from model.torus_graph import Torus_Graph
 # from model.torus_graph_cupy import Torus_Graph
-import numpy as np
+from utils import utils, correlation
 from utils.simulation import sample_from_torus_graph, star_shaped_sample
 from data.dataloader import chennu, chennu_with_pos
 from constant import get_eeg_filenames, get_electrode_names
+
+import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+
 def save(model,output_path):
         with open(output_path, 'wb') as f:
             pickle.dump(model, f)
@@ -49,6 +52,10 @@ state_id = ind_list[patient_id][patient_state_id]
 out_id = f"{exp_id}_{patient_id}_{patient_state_id}_{patient_states[patient_state_id]}_{state_id}"
 
 data_arr = chennu(patient_id=patient_id,state_id=state_id,dim=5)
+correlation.data_to_corr_map(data_arr,utils.PLV,f"output/{out_id}_PLV.png")
+plt.clf()
+correlation.data_to_corr_map(data_arr,utils.PLI,f"output/{out_id}_PLI.png")
+plt.clf()
 
 M = Torus_Graph(5)
 M.estimate(data_arr,mode="naive")
