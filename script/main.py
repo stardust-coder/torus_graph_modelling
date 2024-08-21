@@ -7,6 +7,10 @@ from utils.simulation import sample_from_torus_graph, star_shaped_sample
 from data.dataloader import chennu, chennu_with_pos
 from constant import get_eeg_filenames, get_electrode_names
 import matplotlib.pyplot as plt
+import pickle
+def save(model,output_path):
+        with open(output_path, 'wb') as f:
+            pickle.dump(model, f)
 
 #simulation
 # errors = []
@@ -39,16 +43,21 @@ import matplotlib.pyplot as plt
 exp_id = 0
 patient_id = 2
 patient_state_id = 0
-
 ind_list, FILE_NAME_LIST = get_eeg_filenames()
 patient_states = {0:"baseline",1:"mild",2:"moderate",3:"recovery"}
 state_id = ind_list[patient_id][patient_state_id]
-data_arr = chennu(patient_id=patient_id,state_id=state_id,dim=61)
+out_id = f"{exp_id}_{patient_id}_{patient_state_id}_{patient_states[patient_state_id]}_{state_id}"
 
-M = Torus_Graph(61)
+data_arr = chennu(patient_id=patient_id,state_id=state_id,dim=5)
+
+M = Torus_Graph(5)
 M.estimate(data_arr,mode="naive")
-M.estimate(data_arr,mode="lasso",img_path=f"{exp_id}_{patient_id}_{patient_state_id}_{patient_states[patient_state_id]}_{state_id}_lasso.png")
+save(M,output_path=f"output/{out_id}_naive.pkl")
+M.estimate(data_arr,mode="lasso",img_path=f"output/{out_id}_lasso.png")
+save(M,output_path=f"output/{out_id}_lasso.pkl")
 M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(2*M.d*M.d-2*M.d)]
-M.estimate(data_arr,mode="glasso",img_path=f"{exp_id}_{patient_id}_{state_id}_glasso.png")
+M.estimate(data_arr,mode="glasso",img_path=f"output/{out_id}_glasso.png")
+save(M,output_path=f"output/{out_id}_glasso.pkl")
+
 # M.estimate_by_edge(data_arr,mode="lasso")
 # import pdb; pdb.set_trace()

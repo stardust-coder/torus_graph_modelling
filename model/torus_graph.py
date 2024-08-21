@@ -1,11 +1,15 @@
 import traceback
 import networkx as nx
+import numpy
 import numpy as np
 import scipy
 import itertools
 import matplotlib.pyplot as plt
 from time import time
 from tqdm import tqdm
+from joblib import Parallel, delayed
+import pickle
+import os
 
 def S1_j(x): #x : d  dimensional data
     return np.array([[np.cos(x), np.sin(x)]]).T  # 2x1
@@ -49,40 +53,43 @@ def H(data):
 
 
 def D(x): #x : list of len(d), return m x d array
+
     d = len(x)
     entries = []
     for ind in range(0, d):
         tmp_ = [0 for _ in range(d)]
-        tmp_[ind] = -np.sin(x[ind])
+        tmp_[ind] = -numpy.sin(x[ind])
         entries.append(tmp_)
         tmp_ = [0 for _ in range(d)]
-        tmp_[ind] = np.cos(x[ind])
+        tmp_[ind] = numpy.cos(x[ind])
         entries.append(tmp_)
 
     l = [i for i in range(0, d)]
 
     for v in itertools.combinations(l, 2):
         tmp_ = [0 for _ in range(d)]
-        tmp_[v[0]] = -np.sin(x[v[0]] - x[v[1]])
-        tmp_[v[1]] = np.sin(x[v[0]] - x[v[1]])
+        tmp_[v[0]] = -numpy.sin(x[v[0]] - x[v[1]])
+        tmp_[v[1]] = numpy.sin(x[v[0]] - x[v[1]])
         entries.append(tmp_)
 
         tmp_ = [0 for _ in range(d)]
-        tmp_[v[0]] = np.cos(x[v[0]] - x[v[1]])
-        tmp_[v[1]] = -np.cos(x[v[0]] - x[v[1]])
+        tmp_[v[0]] = numpy.cos(x[v[0]] - x[v[1]])
+        tmp_[v[1]] = -numpy.cos(x[v[0]] - x[v[1]])
         entries.append(tmp_)
 
         tmp_ = [0 for _ in range(d)]
-        tmp_[v[0]] = -np.sin(x[v[0]] + x[v[1]])
-        tmp_[v[1]] = -np.sin(x[v[0]] + x[v[1]])
+        tmp_[v[0]] = -numpy.sin(x[v[0]] + x[v[1]])
+        tmp_[v[1]] = -numpy.sin(x[v[0]] + x[v[1]])
         entries.append(tmp_)
 
         tmp_ = [0 for _ in range(d)]
-        tmp_[v[0]] = np.cos(x[v[0]] + x[v[1]])
-        tmp_[v[1]] = np.cos(x[v[0]] + x[v[1]])
+        tmp_[v[0]] = numpy.cos(x[v[0]] + x[v[1]])
+        tmp_[v[1]] = numpy.cos(x[v[0]] + x[v[1]])
         entries.append(tmp_)
-    mat = np.array(entries)
-    return mat
+    
+    mat = numpy.array(entries)
+    mat_cu = np.asarray(mat)
+    return mat_cu
 
 
 def Gamma(x): #x : list of len(d), return mxm array
@@ -99,26 +106,37 @@ def soft_threshold(param, t_vec):
             res[i][0] = 0
     return res
 
+def shrinkage_operator(param, x):
+    coef = 1 - param/np.linalg.norm(x).item()
+    if coef < 0:
+        coef = 0
+    return coef * x
 
 class Torus_Graph:
     def __init__(self, dim):
         self.d = dim
-        d = self.d
-        self.param = np.zeros((2*dim*dim,1))
-        self.naive_est = np.zeros((2*dim*dim,1))
+        self.model_d = 2*self.d*self.d
+        self.param = np.zeros((self.model_d,1))
+        self.naive_est = np.zeros((self.model_d,1))
         self.naive_est_flag = False
-        self.Gamma_hat =  np.zeros((2*dim*dim,1))
-        self.H_hat = np.zeros((2*dim*dim,1))
+
+        #Calculate matrices
+        self.Gamma_hat =  np.zeros((self.model_d,1))
+        self.H_hat = np.zeros((self.model_d,1))
 
         self.smic = []
         self.reg_path = []
         self.est_path = []
         self.bin_path = []
 
+        #Graph
         self.G = nx.Graph()
-        self.G.add_nodes_from([i+1 for i in range(dim)])
+        self.G.add_nodes_from([i+1 for i in range(self.d)])
         self.pos = nx.circular_layout(self.G)
 
+        #for SMIC calculations
+        self.lambda_list = np.logspace(-2, 1, num=30).tolist()
+        self.glasso_weight = [1 for _ in range(2*self.d*self.d)] #weight of regularization on each group
         self.thresh = 1e-4
         self.index_dictionary = {}
         for i, v in enumerate(list(itertools.combinations(range(1, self.d + 1), 2))):
@@ -144,24 +162,64 @@ class Torus_Graph:
     def get_param(self,t):
         return self.get_param_of_vec(t,self.param)
 
-    def lasso(self,data,l):
-        return 
-    
-    def glasso(self,data,l):
-        return 
-
     def estimate_by_edge(self, data, mode="naive"): #TODO: implement conditional distribution based parallel estimation
-        return 
+        n, d = data.shape
+        start_estimation = time()
+
+        def get_indices(d,a,b):
+            node_to_vec = [[] for _ in range(d)]
+            for i, v in enumerate(itertools.combinations(range(1, d + 1), 2)):
+                node_to_vec[v[0] - 1].append(i)
+                node_to_vec[v[1] - 1].append(i)
+            indices = []
+            indices.append(2 * (a - 1))
+            indices.append(2 * (a - 1) + 1)
+            indices.append(2 * (b - 1))
+            indices.append(2 * (b - 1) + 1)
+            for item in node_to_vec[a - 1]:
+                indices.extend(range(2 * d + 4 * item, 2 * d + 4 * (item + 1)))
+            for item in node_to_vec[b - 1]:
+                indices.extend(range(2 * d + 4 * item, 2 * d + 4 * (item + 1)))
+            indices = sorted(list(set(indices)))
+            return indices
+
+        def est_one_edge(a, b):
+            d = self.d
+            index = get_indices(d,a,b)
+            Gamma_hat_small = np.zeros((8 * (d - 1), 8 * (d - 1)))
+            H_hat = np.zeros((self.model_d, 1))
+            for j in range(n):
+                x = data[j]
+                D_small = D(x)[index, :]
+                Gamma_hat_small = Gamma_hat_small + D_small @ D_small.T
+                tmp_ = H(x)
+                H_hat = H_hat + tmp_
+            Gamma_hat_small = Gamma_hat_small / n
+            H_hat = H_hat / n
+            est_ = np.linalg.solve(Gamma_hat_small, H_hat[index]) #np.linalg.inv(Gamma_hat_small) @ H_hat[index]
+            self.param[index] = est_
+            return est_
+
+        ####idk which one is faster in higher dimensions
+        # for i, v in enumerate(itertools.combinations(range(1, d + 1), 2)):
+        #     est_one_edge(v[0],v[1])
+        #     print("Estimation for:", v)
+        
+        tmp = Parallel(n_jobs=-1,require='sharedmem')(delayed(est_one_edge)(v[0],v[1]) for v in itertools.combinations(range(1, d + 1), 2)) #use joblib, slow because it uses shared memory
+
+        end_estimation = time()
+        self.param_to_graph()
+        print("Estimation time(s):",end_estimation-start_estimation)
             
-    def estimate(self, data, mode="naive"):
+    def estimate(self, data, mode="naive", img_path="#edges_vs_SMIC.png"):
         assert data.shape[1] == self.d, "Data shape mismatch!"
         n, d = data.shape
         start_estimation = time()
 
         def calc_matrices(data): #TODO: acceleration with GPU            
-            Gamma_hat = np.zeros((2 * d * d, 2 * d * d))
-            H_hat = np.zeros((2 * d * d, 1))
-            V_zero_hat = np.zeros((2 * d * d, 2 * d * d))
+            Gamma_hat = np.zeros((self.model_d, self.model_d))
+            H_hat = np.zeros((self.model_d, 1))
+            V_zero_hat = np.zeros((self.model_d, self.model_d))
             
             for j in tqdm(range(n)):
                 x = data[j]
@@ -182,29 +240,41 @@ class Torus_Graph:
             self.param = np.linalg.solve(self.Gamma_hat,self.H_hat) #np.linalg.inv(Gamma_hat)@H_hat 
             self.naive_est = self.param.copy()
             self.naive_est_flag = True
-            print(self.param)
+            print("\nEstimated parameters:\n")
+            print(self.param.T.tolist()[0])
 
-        elif mode=="lasso":
-            print("Running lasso on full model...")
+        elif mode=="lasso" or mode=="glasso":
+            print(f"Running {mode} on full model...")
             d = self.d
             assert self.naive_est_flag != False
             
-            x_admm = np.zeros((2*d*d, 1))  # warm start
-            z_admm = np.zeros((2*d*d, 1))
-            u_admm = np.zeros((2*d*d, 1))
-            
+            x_admm = np.zeros((self.model_d, 1))  # warm start
+            z_admm = np.zeros((self.model_d, 1))
+            u_admm = np.zeros((self.model_d, 1))
+            z_new = np.zeros((self.model_d, 1))
+
             mu = 1  # hyperparameter
-            INV = np.linalg.inv(mu * np.identity(2*d*d) + self.Gamma_hat)
+            INV = np.linalg.inv(mu * np.identity(self.model_d) + self.Gamma_hat)
             est_list = []
             edge_list = []
             binarr_list = []
-            lambda_list = np.logspace(-2, 1, num=30).tolist()
+            lambda_list = self.lambda_list
             for l in lambda_list:
                 iter_ = 10000# 1ならapproxiamte, 大きく設定したほうがexactに近い
                 for _ in range(iter_):
                     x_new = INV @ (mu * (z_admm - u_admm) + self.H_hat)
                     x_dif = np.linalg.norm(x_new - x_admm)
-                    z_new = soft_threshold(l / mu, x_new + u_admm)
+                    if mode=="lasso":
+                        z_new = soft_threshold(l / mu, x_new + u_admm)
+                    elif mode=="glasso":
+                        tmp = 0
+                        for _ in range(d):
+                            z_new[tmp:tmp+2] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+2] + u_admm[tmp:tmp+2])
+                            tmp += 2
+                        tmp = 2*d
+                        for _ in range(int(d*(d-1)/2)):
+                            z_new[tmp:tmp+4] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+4] + u_admm[tmp:tmp+4])
+                            tmp += 4
                     z_dif = np.linalg.norm(z_new - z_admm)
                     r_dif = np.linalg.norm(x_new - z_new)
                     u_new = u_admm + x_new - z_new
@@ -212,11 +282,12 @@ class Torus_Graph:
                     z_admm = z_new.copy()
                     u_admm = u_new.copy()
                     if r_dif < 1e-4 and z_dif < 1e-4:
+                        print(f"Finish ADMM for l = {l}")
                         break
                 est_with_admm_onestep = z_admm.copy()
                 est_list.append(est_with_admm_onestep)
                 E = []
-                B = np.ones((2*d*d,1))
+                B = np.ones((self.model_d,1))
                 for e in list(itertools.combinations(range(1, self.d + 1), 2)):
                     if np.linalg.norm(self.get_param_of_vec((e[0],e[1]),est_with_admm_onestep)) > self.thresh:
                         E.append(e)
@@ -244,31 +315,33 @@ class Torus_Graph:
                 H_hat = H_hat/n
                 smic1 = n*(-est_arr.T@H_hat)  #plugged-in optimal estimator to quaratic form
                 smic1 = smic1.item()
+
                 eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
                 smic2 = sum(eigvals) ### tr(IJ^-1)
                 smic = smic1 + smic2
                 return smic
 
-            scores = [calc_SMIC(j) for j in range(len(lambda_list))]
+            # scores = [calc_SMIC(j) for j in range(len(lambda_list))]
+            scores = Parallel(n_jobs=5)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib, causes error
 
             opt_index = scores.index(min(scores))
             self.param = est_list[opt_index]
 
             ### print estimated results
-            r_prev = (None,None,None,None)
+            r_prev = tuple([None for _ in range(6)])
             for i in range(len(lambda_list)):
-                r_new = lambda_list[i],scores[i], edge_list[i],est_list[i].T
+                r_new = f"Index number:{i}", lambda_list[i],scores[i], f"{len(edge_list[i])} edges", edge_list[i],est_list[i].T.tolist()[0]
                 if edge_list[i] == edge_list[opt_index]:
                     print("[OPTIMAL GRAPH STRUCTURE with the smallest SMIC]")
-                if r_new[2] == r_prev[2]:
+                print(r_new)
+                if r_new[4] == r_prev[4]:
                     pass
                 else:
-                    print(r_new)
                     r_prev = r_new
             
             plt.figure(figsize=(10,10))
             plt.plot([len(x) for x in edge_list],scores)
-            plt.savefig("#edges vs SMIC")
+            plt.savefig(img_path)
             plt.clf()
             
             ### save results to model
@@ -277,24 +350,25 @@ class Torus_Graph:
             self.reg_path = edge_list
             self.bin_path = binarr_list
 
-
-        # elif mode=="glasso":
         else:
             pass
 
         end_estimation = time()
+        self.param_to_graph()
+        print("Estimation time(s):",end_estimation-start_estimation)
+    
+    def param_to_graph(self):
         for e in list(itertools.combinations(range(1, self.d + 1), 2)):
             weight = np.linalg.norm(self.get_param((e[0],e[1])))
             if weight > self.thresh:
-                self.G.add_edge(e[0],e[1],weight=weight)
+                self.G.add_edge(e[0],e[1],weight=weight.item())
             else:
                 try:
                     self.G.remove_edge(e[0],e[1])
                 except:
                     pass
 
-        print("Estimation time(s):",end_estimation-start_estimation)
-        
+
     def graph_property(self):
         print("Average clustering coefficient = ", nx.average_clustering(self.G))
         print("Average shortest path length = ", nx.average_shortest_path_length(self.G))
@@ -306,7 +380,7 @@ class Torus_Graph:
             dic[i] = arr[i]
         self.pos = dic
 
-    def plot(self, weight=False):
+    def plot(self, img_path="graph.png", weight=True):
         weights = nx.get_edge_attributes(self.G, 'weight').values()
         
         plt.figure(figsize=(10,10)) #グラフエリアのサイズ
@@ -320,4 +394,7 @@ class Torus_Graph:
         sm.set_array([])
         cbar = plt.colorbar(sm,ax=plt.gca())
         plt.show()
-        plt.savefig("graph.png")
+        plt.savefig(img_path)
+
+    
+

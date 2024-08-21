@@ -8,8 +8,9 @@ import matplotlib.pyplot as plt
 from time import time
 from tqdm import tqdm
 from joblib import Parallel, delayed
+import pickle
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 def S1_j(x): #x : d  dimensional data
     return np.array([[np.cos(x), np.sin(x)]]).T  # 2x1
@@ -397,3 +398,6 @@ class Torus_Graph:
         cbar = plt.colorbar(sm,ax=plt.gca())
         plt.show()
         plt.savefig(img_path)
+
+    
+
