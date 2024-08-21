@@ -325,7 +325,7 @@ class Torus_Graph:
                 return smic
 
             # scores = [calc_SMIC(j) for j in range(len(lambda_list))]
-            scores = Parallel(n_jobs=5)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib, causes error
+            scores = Parallel(n_jobs=10)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib, causes error
 
             opt_index = scores.index(min(scores))
             self.param = est_list[opt_index]
