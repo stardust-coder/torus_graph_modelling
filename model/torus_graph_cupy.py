@@ -375,7 +375,7 @@ class Torus_Graph:
     def graph_property(self):
         print("Average clustering coefficient = ", nx.average_clustering(self.G))
         print("Average shortest path length = ", nx.average_shortest_path_length(self.G))
-        print("Small-world index = ", nx.sigma(self.G),nx.omega(self.G))
+        print("Small-world coefficient = ", nx.sigma(self.G) #,nx.omega(self.G))
 
     def set_coordinates(self, arr):
         dic = {}

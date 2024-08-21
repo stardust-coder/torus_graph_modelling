@@ -1,7 +1,7 @@
 import sys
 sys.path.append(".")
-# from model.torus_graph import Torus_Graph
-from model.torus_graph_cupy import Torus_Graph
+from model.torus_graph import Torus_Graph
+# from model.torus_graph_cupy import Torus_Graph
 import numpy as np
 from utils.simulation import sample_from_torus_graph, star_shaped_sample
 from data.dataloader import chennu, chennu_with_pos
@@ -41,7 +41,7 @@ def save(model,output_path):
 # data_arr = star_shaped_sample(1000)
 
 exp_id = 0
-patient_id = 2
+patient_id = 3
 patient_state_id = 0
 ind_list, FILE_NAME_LIST = get_eeg_filenames()
 patient_states = {0:"baseline",1:"mild",2:"moderate",3:"recovery"}
