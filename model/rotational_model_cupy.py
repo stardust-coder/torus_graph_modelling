@@ -1,7 +1,7 @@
 import traceback
 import networkx as nx
 import numpy
-import numpy as np
+import cupy as np
 import scipy
 import itertools
 import matplotlib.pyplot as plt
@@ -10,6 +10,7 @@ from tqdm import tqdm
 from joblib import Parallel, delayed
 import pickle
 import os
+os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 def S1_j(x): #x : d  dimensional data
     return np.array([[np.cos(x), np.sin(x)]]).T  # 2x1
@@ -27,8 +28,6 @@ def S2_jk(x, j, k):
             [
                 np.cos(x[j] - x[k]),
                 np.sin(x[j] - x[k]),
-                np.cos(x[j] + x[k]),
-                np.sin(x[j] + x[k]),
             ]
         ]
     ).T
@@ -76,16 +75,6 @@ def D(x): #x : list of len(d), return m x d array
         tmp_[v[0]] = numpy.cos(x[v[0]] - x[v[1]])
         tmp_[v[1]] = -numpy.cos(x[v[0]] - x[v[1]])
         entries.append(tmp_)
-
-        tmp_ = [0 for _ in range(d)]
-        tmp_[v[0]] = -numpy.sin(x[v[0]] + x[v[1]])
-        tmp_[v[1]] = -numpy.sin(x[v[0]] + x[v[1]])
-        entries.append(tmp_)
-
-        tmp_ = [0 for _ in range(d)]
-        tmp_[v[0]] = numpy.cos(x[v[0]] + x[v[1]])
-        tmp_[v[1]] = numpy.cos(x[v[0]] + x[v[1]])
-        entries.append(tmp_)
     
     mat = numpy.array(entries)
     mat_cu = np.asarray(mat)
@@ -115,7 +104,12 @@ def shrinkage_operator(param, x):
 class Torus_Graph_Model:
     def __init__(self, dim):
         self.d = dim
-        self.model_d = 2*self.d*self.d
+        self.single_param_dim = 2
+        self.pairwise_param_dim = 4
+        self.initialize()
+
+    def initialize(self):
+        self.model_d = self.single_param_dim * self.d + self.pairwise_param_dim * int(self.d*(self.d-1)/2)
         self.param = np.zeros((self.model_d,1))
         self.naive_est = np.zeros((self.model_d,1))
         self.naive_est_flag = False
@@ -136,7 +130,7 @@ class Torus_Graph_Model:
 
         #for SMIC calculations
         self.lambda_list = np.logspace(-2, 1, num=30).tolist()
-        self.glasso_weight = [1 for _ in range(2*self.d*self.d)] #weight of regularization on each group
+        self.glasso_weight = [1 for _ in range(self.model_d)] #weight of regularization on each group
         self.thresh = 1e-4
         self.index_dictionary = {}
         for i, v in enumerate(list(itertools.combinations(range(1, self.d + 1), 2))):
@@ -146,7 +140,8 @@ class Torus_Graph_Model:
         return self.index_dictionary[(a,b)]
 
     def assign_by_edge(self,edge,val):
-        self.param[2*self.d+4*(self.edge_index(*edge)-1):2*self.d+4*(self.edge_index(*edge)),:] = val
+        tmp_ = self.single_param_dim*self.d+self.pairwise_param_dim*(self.edge_index(*edge)-1)
+        self.param[tmp_:tmp_+self.pairwise_param_dim,:] = val
 
     def get_param_of_vec(self,t,vec):
         '''
@@ -155,9 +150,10 @@ class Torus_Graph_Model:
         '''
         assert len(t) in [1,2]
         if len(t) == 1:
-            return vec[2*(t[0]-1):2*(t[0]),:]
+            return vec[self.single_param_dim*(t[0]-1):self.single_param_dim*(t[0]),:]
         elif len(t) == 2:
-            return vec[2*self.d+4*(self.edge_index(t[0],t[1])-1):2*self.d+4*(self.edge_index(t[0],t[1])),:]
+            tmp_ = self.single_param_dim*self.d+self.pairwise_param_dim*(self.edge_index(t[0],t[1])-1)
+            return vec[tmp_:tmp_+self.pairwise_param_dim,:]
     
     def get_param(self,t):
         return self.get_param_of_vec(t,self.param)
@@ -172,14 +168,14 @@ class Torus_Graph_Model:
                 node_to_vec[v[0] - 1].append(i)
                 node_to_vec[v[1] - 1].append(i)
             indices = []
-            indices.append(2 * (a - 1))
-            indices.append(2 * (a - 1) + 1)
-            indices.append(2 * (b - 1))
-            indices.append(2 * (b - 1) + 1)
+            indices.append(self.single_param_dim * (a - 1))
+            indices.append(self.single_param_dim * (a - 1) + 1)
+            indices.append(self.single_param_dim * (b - 1))
+            indices.append(self.single_param_dim * (b - 1) + 1)
             for item in node_to_vec[a - 1]:
-                indices.extend(range(2 * d + 4 * item, 2 * d + 4 * (item + 1)))
+                indices.extend(range(self.single_param_dim * d + self.pairwise_param_dim * item, self.single_param_dim * d + self.pairwise_param_dim * (item + 1)))
             for item in node_to_vec[b - 1]:
-                indices.extend(range(2 * d + 4 * item, 2 * d + 4 * (item + 1)))
+                indices.extend(range(self.single_param_dim * d + self.pairwise_param_dim * item, self.single_param_dim * d + self.pairwise_param_dim * (item + 1)))
             indices = sorted(list(set(indices)))
             return indices
 
@@ -268,13 +264,15 @@ class Torus_Graph_Model:
                         z_new = soft_threshold(l / mu, x_new + u_admm)
                     elif mode=="glasso":
                         tmp = 0
-                        for _ in range(d):
-                            z_new[tmp:tmp+2] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+2] + u_admm[tmp:tmp+2])
-                            tmp += 2
-                        tmp = 2*d
+                        inc = self.single_param_dim
+                        if self.single_param_dim != 0:
+                            for _ in range(d):
+                                z_new[tmp:tmp+inc] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+inc] + u_admm[tmp:tmp+inc])
+                                tmp += inc
+                        inc = self.pairwise_param_dim
                         for _ in range(int(d*(d-1)/2)):
-                            z_new[tmp:tmp+4] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+4] + u_admm[tmp:tmp+4])
-                            tmp += 4
+                            z_new[tmp:tmp+inc] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+inc] + u_admm[tmp:tmp+inc])
+                            tmp += inc
                     z_dif = np.linalg.norm(z_new - z_admm)
                     r_dif = np.linalg.norm(x_new - z_new)
                     u_new = u_admm + x_new - z_new
@@ -293,15 +291,15 @@ class Torus_Graph_Model:
                         E.append(e)
                     else:
                         ind = self.index_dictionary[e]
-                        B[2*d+4*(ind-1):2*d+4*ind] = 0
+                        B[self.single_param_dim*d+self.pairwise_param_dim*(ind-1):self.single_param_dim*d+self.pairwise_param_dim*ind] = 0
                 edge_list.append(E)
                 binarr_list.append(B)
             
             def calc_SMIC(j):
                 est_arr = self.naive_est * binarr_list[j]
-                I = np.zeros((2*(d**2),2*(d**2)))
-                Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
-                H_hat = np.zeros((2*(d**2), 1))
+                I = np.zeros((self.model_d,self.model_d))
+                Gamma_hat = np.zeros((self.model_d,self.model_d))
+                H_hat = np.zeros((self.model_d, 1))
                 for data_ind in tqdm(range(n)):
                     x = data[data_ind]
                     G_ = Gamma(x)
@@ -316,13 +314,15 @@ class Torus_Graph_Model:
                 smic1 = n*(-est_arr.T@H_hat)  #plugged-in optimal estimator to quaratic form
                 smic1 = smic1.item()
 
+                I = np.asnumpy(I)
+                Gamma_hat = np.asnumpy(Gamma_hat)
                 eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
                 smic2 = sum(eigvals) ### tr(IJ^-1)
                 smic = smic1 + smic2
                 return smic
 
             # scores = [calc_SMIC(j) for j in range(len(lambda_list))]
-            scores = Parallel(n_jobs=5)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib, causes error
+            scores = Parallel(n_jobs=10)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib, causes error
 
             opt_index = scores.index(min(scores))
             self.param = est_list[opt_index]
@@ -333,10 +333,11 @@ class Torus_Graph_Model:
                 r_new = f"Index number:{i}", lambda_list[i],scores[i], f"{len(edge_list[i])} edges", edge_list[i],est_list[i].T.tolist()[0]
                 if edge_list[i] == edge_list[opt_index]:
                     print("[OPTIMAL GRAPH STRUCTURE with the smallest SMIC]")
-                print(r_new)
+                
                 if r_new[4] == r_prev[4]:
                     pass
                 else:
+                    print(r_new)
                     r_prev = r_new
             
             plt.figure(figsize=(10,10))
@@ -361,18 +362,30 @@ class Torus_Graph_Model:
         for e in list(itertools.combinations(range(1, self.d + 1), 2)):
             weight = np.linalg.norm(self.get_param((e[0],e[1])))
             if weight > self.thresh:
-                self.G.add_edge(e[0],e[1],weight=weight.item())
+                self.G.add_edge(e[0],e[1],weight=weight.get().item())
             else:
                 try:
                     self.G.remove_edge(e[0],e[1])
                 except:
                     pass
 
+    def graph_property(self,abbr=True):
+        if not abbr:
+            print("Average clustering coefficient = ", nx.average_clustering(self.G))
+            print("Average shortest path length = ", nx.average_shortest_path_length(self.G))
+            print("Edge number = ", len(self.G.edges))
+            C = nx.community.louvain_communities(self.G, seed=123) # assume high dimensional graph
+            print("Modularity = ",nx.community.modularity(self.G,C))
+            print("Small-world coefficient = ", nx.sigma(self.G)) #,nx.omega(self.G))
+            res = ",".join([str(x) for x in [len(self.G.edges),"{:.3f}".format(nx.community.modularity(self.G,C)),"{:.3f}".format(nx.average_clustering(self.G)),"{:.3f}".format(nx.average_shortest_path_length(self.G)),"{:.3f}".format(nx.sigma(self.G))]])
+            res = "(" + res + ")"
+            print(res)
+        else:
+            C = nx.community.louvain_communities(self.G, seed=123) # assume high dimensional graph
+            res = ",".join([str(x) for x in [len(self.G.edges),"{:.3f}".format(nx.community.modularity(self.G,C)),"{:.3f}".format(nx.average_clustering(self.G)),"{:.3f}".format(nx.average_shortest_path_length(self.G))]])
+            res = "(" + res + ")"
+            print(res)
 
-    def graph_property(self):
-        print("Average clustering coefficient = ", nx.average_clustering(self.G))
-        print("Average shortest path length = ", nx.average_shortest_path_length(self.G))
-        print("Small-world index = ", nx.sigma(self.G),nx.omega(self.G))
 
     def set_coordinates(self, arr):
         dic = {}
@@ -396,51 +409,9 @@ class Torus_Graph_Model:
         plt.show()
         plt.savefig(img_path)
 
-    def cross_validation(self,data):
-        assert len(self.reg_path) != 0
-        d = self.d
-
-        def calc_SMCV(j):
-            smcv = 0
-            for i in range(len(data)):
-                print(i)
-                data_arr_del = np.delete(data,obj=i,axis=0)
-                n = len(data_arr_del)
-                Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
-                H_hat = np.zeros((2*(d**2), 1))
-                for data_ind in range(len(data_arr_del)):
-                    x = data_arr_del[data_ind]
-                    G_ = Gamma(x)
-                    Gamma_hat = Gamma_hat + G_
-                    H_ = H(x)
-                    H_hat = H_hat + H_
-                Gamma_hat = Gamma_hat/n #J_hat in paper
-                H_hat = H_hat/n
-                est_arr = np.linalg.solve(Gamma_hat,H_hat)
-                est_arr = est_arr * self.bin_path[j]
-                smcv += -est_arr.T@H_hat
-            return smcv
-
-        scores_smvc = Parallel(n_jobs=10)(delayed(calc_SMCV)(j) for j in range(len(self.lambda_list))) #use joblib, causes error
-        opt_index_smvc = scores_smvc.index(min(scores))
-        ### print estimated results
-        r_prev = tuple([None for _ in range(6)])
-        edge_list = self.reg_path
-        for i in range(len(self.lambda_list)):
-            r_new = f"Index number:{i}", self.lambda_list[i],scores[i], f"{len(edge_list[i])} edges", edge_list[i],est_list[i].T.tolist()[0]
-            if self.edge_list[i] == self.edge_list[opt_index]:
-                print("[OPTIMAL GRAPH STRUCTURE with the smallest SMIC]")
-            if r_new[4] == r_prev[4]:
-                pass
-            else:
-                print(r_new)
-                r_prev = r_new
-        
-        plt.figure(figsize=(10,10))
-        plt.plot([len(x) for x in edge_list],scores_smvc)
-        plt.savefig("smvc_glasso.png")
-        plt.clf()
-
-        import pdb; pdb.set_trace()
-    
-
+class Rotational_Model(Torus_Graph_Model):
+    def __init__(self,dim):
+        super().__init__(dim)
+        self.single_param_dim = 2
+        self.pairwise_param_dim = 2
+        self.initialize()

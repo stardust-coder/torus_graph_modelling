@@ -113,10 +113,15 @@ def shrinkage_operator(param, x):
         coef = 0
     return coef * x
 
-class Torus_Graph:
+class Torus_Graph_Model:
     def __init__(self, dim):
         self.d = dim
-        self.model_d = 2*self.d*self.d
+        self.single_param_dim = 2
+        self.pairwise_param_dim = 4
+        self.initialize()
+
+    def initialize(self):
+        self.model_d = self.single_param_dim * self.d + self.pairwise_param_dim * int(self.d*(self.d-1)/2)
         self.param = np.zeros((self.model_d,1))
         self.naive_est = np.zeros((self.model_d,1))
         self.naive_est_flag = False
@@ -137,7 +142,7 @@ class Torus_Graph:
 
         #for SMIC calculations
         self.lambda_list = np.logspace(-2, 1, num=30).tolist()
-        self.glasso_weight = [1 for _ in range(2*self.d*self.d)] #weight of regularization on each group
+        self.glasso_weight = [1 for _ in range(self.model_d)] #weight of regularization on each group
         self.thresh = 1e-4
         self.index_dictionary = {}
         for i, v in enumerate(list(itertools.combinations(range(1, self.d + 1), 2))):
@@ -147,7 +152,8 @@ class Torus_Graph:
         return self.index_dictionary[(a,b)]
 
     def assign_by_edge(self,edge,val):
-        self.param[2*self.d+4*(self.edge_index(*edge)-1):2*self.d+4*(self.edge_index(*edge)),:] = val
+        tmp_ = self.single_param_dim*self.d+self.pairwise_param_dim*(self.edge_index(*edge)-1)
+        self.param[tmp_:tmp_+self.pairwise_param_dim,:] = val
 
     def get_param_of_vec(self,t,vec):
         '''
@@ -156,9 +162,10 @@ class Torus_Graph:
         '''
         assert len(t) in [1,2]
         if len(t) == 1:
-            return vec[2*(t[0]-1):2*(t[0]),:]
+            return vec[self.single_param_dim*(t[0]-1):self.single_param_dim*(t[0]),:]
         elif len(t) == 2:
-            return vec[2*self.d+4*(self.edge_index(t[0],t[1])-1):2*self.d+4*(self.edge_index(t[0],t[1])),:]
+            tmp_ = self.single_param_dim*self.d+self.pairwise_param_dim*(self.edge_index(t[0],t[1])-1)
+            return vec[tmp_:tmp_+self.pairwise_param_dim,:]
     
     def get_param(self,t):
         return self.get_param_of_vec(t,self.param)
@@ -173,14 +180,14 @@ class Torus_Graph:
                 node_to_vec[v[0] - 1].append(i)
                 node_to_vec[v[1] - 1].append(i)
             indices = []
-            indices.append(2 * (a - 1))
-            indices.append(2 * (a - 1) + 1)
-            indices.append(2 * (b - 1))
-            indices.append(2 * (b - 1) + 1)
+            indices.append(self.single_param_dim * (a - 1))
+            indices.append(self.single_param_dim * (a - 1) + 1)
+            indices.append(self.single_param_dim * (b - 1))
+            indices.append(self.single_param_dim * (b - 1) + 1)
             for item in node_to_vec[a - 1]:
-                indices.extend(range(2 * d + 4 * item, 2 * d + 4 * (item + 1)))
+                indices.extend(range(self.single_param_dim * d + self.pairwise_param_dim * item, self.single_param_dim * d + self.pairwise_param_dim * (item + 1)))
             for item in node_to_vec[b - 1]:
-                indices.extend(range(2 * d + 4 * item, 2 * d + 4 * (item + 1)))
+                indices.extend(range(self.single_param_dim * d + self.pairwise_param_dim * item, self.single_param_dim * d + self.pairwise_param_dim * (item + 1)))
             indices = sorted(list(set(indices)))
             return indices
 
@@ -269,13 +276,15 @@ class Torus_Graph:
                         z_new = soft_threshold(l / mu, x_new + u_admm)
                     elif mode=="glasso":
                         tmp = 0
-                        for _ in range(d):
-                            z_new[tmp:tmp+2] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+2] + u_admm[tmp:tmp+2])
-                            tmp += 2
-                        tmp = 2*d
+                        inc = self.single_param_dim
+                        if self.single_param_dim != 0:
+                            for _ in range(d):
+                                z_new[tmp:tmp+inc] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+inc] + u_admm[tmp:tmp+inc])
+                                tmp += inc
+                        inc = self.pairwise_param_dim
                         for _ in range(int(d*(d-1)/2)):
-                            z_new[tmp:tmp+4] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+4] + u_admm[tmp:tmp+4])
-                            tmp += 4
+                            z_new[tmp:tmp+inc] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+inc] + u_admm[tmp:tmp+inc])
+                            tmp += inc
                     z_dif = np.linalg.norm(z_new - z_admm)
                     r_dif = np.linalg.norm(x_new - z_new)
                     u_new = u_admm + x_new - z_new
@@ -294,15 +303,15 @@ class Torus_Graph:
                         E.append(e)
                     else:
                         ind = self.index_dictionary[e]
-                        B[2*d+4*(ind-1):2*d+4*ind] = 0
+                        B[self.single_param_dim*d+self.pairwise_param_dim*(ind-1):self.single_param_dim*d+self.pairwise_param_dim*ind] = 0
                 edge_list.append(E)
                 binarr_list.append(B)
             
             def calc_SMIC(j):
                 est_arr = self.naive_est * binarr_list[j]
-                I = np.zeros((2*(d**2),2*(d**2)))
-                Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
-                H_hat = np.zeros((2*(d**2), 1))
+                I = np.zeros((self.model_d,self.model_d))
+                Gamma_hat = np.zeros((self.model_d,self.model_d))
+                H_hat = np.zeros((self.model_d, 1))
                 for data_ind in tqdm(range(n)):
                     x = data[data_ind]
                     G_ = Gamma(x)
@@ -336,10 +345,10 @@ class Torus_Graph:
                 r_new = f"Index number:{i}", lambda_list[i],scores[i], f"{len(edge_list[i])} edges", edge_list[i],est_list[i].T.tolist()[0]
                 if edge_list[i] == edge_list[opt_index]:
                     print("[OPTIMAL GRAPH STRUCTURE with the smallest SMIC]")
-                print(r_new)
                 if r_new[4] == r_prev[4]:
                     pass
                 else:
+                    print(r_new)
                     r_prev = r_new
             
             plt.figure(figsize=(10,10))
@@ -410,6 +419,3 @@ class Torus_Graph:
         cbar = plt.colorbar(sm,ax=plt.gca())
         plt.show()
         plt.savefig(img_path)
-
-    
-

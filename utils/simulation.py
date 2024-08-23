@@ -101,6 +101,16 @@ def star_shaped_sample(N):
     data_arr, acc = sample_from_torus_graph(N, 5, true_phi, False)
     return data_arr
 
+def star_shaped_rotational_sample(N):
+    true_phi = np.zeros((50,1))
+    true_phi[0:10,:] = 0.0 #
+    true_phi[14:16,:] = 0.3 #(1,3)に対応
+    true_phi[18:20,:] = 0.3 #(1,4)に対応
+    true_phi[30:32,:] = 0.3 #(2,4)に対応
+    true_phi[34:36,:] = 0.3 #(2,5)に対応
+    true_phi[42:44,:] = 0.3 #(3,5)に対応
+    data_arr, acc = sample_from_torus_graph(N, 5, true_phi, False)
+    return data_arr
 
 def bagraph_sample(N):
     d = 61
