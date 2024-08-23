@@ -396,5 +396,51 @@ class Torus_Graph:
         plt.show()
         plt.savefig(img_path)
 
+    def cross_validation(self,data):
+        assert len(self.reg_path) != 0
+        d = self.d
+
+        def calc_SMCV(j):
+            smcv = 0
+            for i in range(len(data)):
+                print(i)
+                data_arr_del = np.delete(data,obj=i,axis=0)
+                n = len(data_arr_del)
+                Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
+                H_hat = np.zeros((2*(d**2), 1))
+                for data_ind in range(len(data_arr_del)):
+                    x = data_arr_del[data_ind]
+                    G_ = Gamma(x)
+                    Gamma_hat = Gamma_hat + G_
+                    H_ = H(x)
+                    H_hat = H_hat + H_
+                Gamma_hat = Gamma_hat/n #J_hat in paper
+                H_hat = H_hat/n
+                est_arr = np.linalg.solve(Gamma_hat,H_hat)
+                est_arr = est_arr * self.bin_path[j]
+                smcv += -est_arr.T@H_hat
+            return smcv
+
+        scores_smvc = Parallel(n_jobs=10)(delayed(calc_SMCV)(j) for j in range(len(self.lambda_list))) #use joblib, causes error
+        opt_index_smvc = scores_smvc.index(min(scores))
+        ### print estimated results
+        r_prev = tuple([None for _ in range(6)])
+        edge_list = self.reg_path
+        for i in range(len(self.lambda_list)):
+            r_new = f"Index number:{i}", self.lambda_list[i],scores[i], f"{len(edge_list[i])} edges", edge_list[i],est_list[i].T.tolist()[0]
+            if self.edge_list[i] == self.edge_list[opt_index]:
+                print("[OPTIMAL GRAPH STRUCTURE with the smallest SMIC]")
+            print(r_new)
+            if r_new[4] == r_prev[4]:
+                pass
+            else:
+                r_prev = r_new
+        
+        plt.figure(figsize=(10,10))
+        plt.plot([len(x) for x in edge_list],scores)
+        plt.savefig("SM-CV.png")
+        plt.clf()
+
+        import pdb; pdb.set_trace()
     
 

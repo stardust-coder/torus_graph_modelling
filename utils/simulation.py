@@ -4,9 +4,10 @@ from tqdm import tqdm
 from time import time
 import pdb
 import matplotlib.pyplot as plt
+import networkx as nx
 import mne
 import pickle
-from scipy.stats import chi2
+from scipy.stats import chi2, vonmises
 import sys
 import json
 sys.path.append(".")
@@ -25,21 +26,15 @@ def core_of_torus_graph(x, phi):
 
     return np.exp(core)
 
+def core_of_torus_graph_2(x, d, phi):
+    x = list(x.T[0])
+    core = phi[2*d:,:].T @ S2(x)
+    return np.exp(core)
 
 def sample_from_torus_graph(num_samples, d, phi, verbose=True):
-    """
-    num_samples : サンプリングしたい数
-    d : dimension
-    phi : モデルパラメタ
-
-    """
-
     assert len(phi) == 2 * d * d
-
-    # rejection samplingを行う
     def q(x):
         return 1
-
     phi_ = phi.flatten().tolist()  # リストに変換
     core = 0
     for ind in range(d * d):
@@ -71,6 +66,18 @@ def sample_from_torus_graph(num_samples, d, phi, verbose=True):
     return np.concatenate(samples, axis=1).T, acceptance / trial
 
 
+# def gibbs_sample_from_torus_graph(N,d,phi):
+#     samples = []
+#     sample = [0 for _ in range(d)]
+#     for _ in range(N+burnin):
+#         for j in range(d):
+#             loc = #TODO
+#             kappa = #TODO
+#             sample[j] = vonmises(loc=loc, kappa=kappa).rvs(1)
+#         samples.append(sample)
+#     return np.concatenate(samples[burnin:], axis=1).T, None
+
+
 def torus_graph_density(phi, x1, x2):
     kernel = 0
     kernel += phi[0] * np.cos(x1) + phi[1] * np.sin(x1)
@@ -93,3 +100,30 @@ def star_shaped_sample(N):
     true_phi[42:46,:] = 0.3 #(3,5)に対応
     data_arr, acc = sample_from_torus_graph(N, 5, true_phi, False)
     return data_arr
+
+
+def bagraph_sample(N):
+    d = 61
+    m = 5
+    G_ = nx.barabasi_albert_graph(d, m, seed=None, initial_graph=None)
+    true_phi = np.zeros((2*d*d,1))
+
+    index_dictionary = {}
+    for i, v in enumerate(list(itertools.combinations(range(0, d), 2))):
+        index_dictionary[v] = i
+    
+    for e in G_.edges:
+        ind = index_dictionary[e]
+        true_phi[2*d+4*ind:2*d+4*ind+4] = 0.1
+    
+    data_arr, acc = sample_from_torus_graph(N, d, true_phi, False)
+    
+    return data_arr
+
+    
+
+
+    
+    
+    
+

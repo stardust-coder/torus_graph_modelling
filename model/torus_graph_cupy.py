@@ -371,11 +371,23 @@ class Torus_Graph:
                 except:
                     pass
 
+    def graph_property(self,abbr=True):
+        if not abbr:
+            print("Average clustering coefficient = ", nx.average_clustering(self.G))
+            print("Average shortest path length = ", nx.average_shortest_path_length(self.G))
+            print("Edge number = ", len(self.G.edges))
+            C = nx.community.louvain_communities(self.G, seed=123) # assume high dimensional graph
+            print("Modularity = ",nx.community.modularity(self.G,C))
+            print("Small-world coefficient = ", nx.sigma(self.G)) #,nx.omega(self.G))
+            res = ",".join([str(x) for x in [len(self.G.edges),"{:.3f}".format(nx.community.modularity(self.G,C)),"{:.3f}".format(nx.average_clustering(self.G)),"{:.3f}".format(nx.average_shortest_path_length(self.G)),"{:.3f}".format(nx.sigma(self.G))]])
+            res = "(" + res + ")"
+            print(res)
+        else:
+            C = nx.community.louvain_communities(self.G, seed=123) # assume high dimensional graph
+            res = ",".join([str(x) for x in [len(self.G.edges),"{:.3f}".format(nx.community.modularity(self.G,C)),"{:.3f}".format(nx.average_clustering(self.G)),"{:.3f}".format(nx.average_shortest_path_length(self.G))]])
+            res = "(" + res + ")"
+            print(res)
 
-    def graph_property(self):
-        print("Average clustering coefficient = ", nx.average_clustering(self.G))
-        print("Average shortest path length = ", nx.average_shortest_path_length(self.G))
-        print("Small-world coefficient = ", nx.sigma(self.G) #,nx.omega(self.G))
 
     def set_coordinates(self, arr):
         dic = {}
