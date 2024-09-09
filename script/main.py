@@ -17,7 +17,7 @@ def save(model,output_path):
         with open(output_path, 'wb') as f:
             pickle.dump(model, f)
 
-#naive vs conditional
+###naive vs conditional
 # errors = []
 # for _ in range(30):
 #     data_arr = star_shaped_sample(10000)
@@ -29,41 +29,30 @@ def save(model,output_path):
 #     errors.append(error)
 # import pdb; pdb.set_trace()
 
-#simulation
+###simulation
 # data_arr = bagraph_sample(10000)
-# data_arr = star_shaped_sample(1000)
-data_arr = star_shaped_rotational_sample(1000)
+data_arr = star_shaped_sample(1000)
+# data_arr = star_shaped_rotational_sample(1000)
 
-M = Rotational_Model(5)
+# M = Rotational_Model(5)
 # M = Torus_Graph_Model(5)
 
-M.estimate(data_arr,mode="naive")
+# M.estimate(data_arr,mode="naive")
 # print(M.param.T.tolist()[0])
 # M.estimate(data_arr,mode="lasso")
 # print(M.param.T.tolist()[0])
 # M.estimate(data_arr,mode="glasso")
 # print(M.param.T.tolist()[0])
-M.glasso_weight = [0 for _ in range(10)] + [1 for _ in range(40)]
-M.estimate(data_arr,mode="glasso")
+# M.glasso_weight = [0 for _ in range(10)] + [1 for _ in range(40)]
+# M.estimate(data_arr,mode="glasso")
 # print(M.param.T.tolist()[0])
-import pdb; pdb.set_trace()
-
-
-#SMIC vs CV
-data_arr, _ = sample_from_Torus_Graph(num_samples=10000,d=3,phi=np.array([[0,0,0,0,0,0,0.3,0.3,0.3,0.3,0,0,0,0,0.3,0.3,0.3,0.3]]).T)
-M = Torus_Graph_Model(3)
-M.estimate(data_arr,mode="naive")
-M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(2*M.d*M.d-2*M.d)]
-M.estimate(data_arr,mode="glasso",img_path=f"smic_glasso.png")
-M.cross_validation(data_arr)
-import pdb; pdb.set_trace()
-
+# import pdb; pdb.set_trace()
 
 #Main codes
 ###Load Data
 # data_arr = star_shaped_sample(1000)
 exp_id = 1
-patient_id = 6
+patient_id = 7
 patient_state_id = 3
 ind_list, FILE_NAME_LIST = get_eeg_filenames()
 patient_states = {0:"baseline",1:"mild",2:"moderate",3:"recovery"}
@@ -76,7 +65,9 @@ plt.clf()
 correlation.data_to_corr_map(data_arr,utils.PLI,f"output/{out_id}_PLI.png")
 plt.clf()
 
-M = Torus_Graph_Model(61)
+# M = Torus_Graph_Model(61)
+M = Rotational_Model(61)
+
 
 ###Naive
 M.estimate(data_arr,mode="naive")

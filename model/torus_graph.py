@@ -112,6 +112,9 @@ def shrinkage_operator(param, x):
         coef = 0
     return coef * x
 
+def model_to_indices(l):
+    return [i for i, x in enumerate(l) if x != 0]
+
 class Torus_Graph_Model:
     def __init__(self, dim):
         self.d = dim
@@ -221,7 +224,7 @@ class Torus_Graph_Model:
             H_hat = np.zeros((self.model_d, 1))
             V_zero_hat = np.zeros((self.model_d, self.model_d))
             
-            for j in tqdm(range(n)):
+            for j in range(n):
                 x = data[j]
                 Gamma_hat = Gamma_hat + Gamma(x)
                 tmp_ = H(x)
@@ -282,7 +285,7 @@ class Torus_Graph_Model:
                     z_admm = z_new.copy()
                     u_admm = u_new.copy()
                     if r_dif < 1e-4 and z_dif < 1e-4:
-                        print(f"Finish ADMM for l = {l}")
+                        # print(f"Finish ADMM for l = {l}")
                         break
                 est_with_admm_onestep = z_admm.copy()
                 est_list.append(est_with_admm_onestep)
@@ -302,7 +305,7 @@ class Torus_Graph_Model:
                 I = np.zeros((2*(d**2),2*(d**2)))
                 Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
                 H_hat = np.zeros((2*(d**2), 1))
-                for data_ind in tqdm(range(n)):
+                for data_ind in range(n):
                     x = data[data_ind]
                     G_ = Gamma(x)
                     Gamma_hat = Gamma_hat + G_
@@ -333,10 +336,10 @@ class Torus_Graph_Model:
                 r_new = f"Index number:{i}", lambda_list[i],scores[i], f"{len(edge_list[i])} edges", edge_list[i],est_list[i].T.tolist()[0]
                 if edge_list[i] == edge_list[opt_index]:
                     print("[OPTIMAL GRAPH STRUCTURE with the smallest SMIC]")
-                print(r_new)
                 if r_new[4] == r_prev[4]:
                     pass
                 else:
+                    print(r_new)
                     r_prev = r_new
             
             plt.figure(figsize=(10,10))
@@ -403,32 +406,31 @@ class Torus_Graph_Model:
         def calc_SMCV(j):
             smcv = 0
             for i in range(len(data)):
-                print(i)
                 data_arr_del = np.delete(data,obj=i,axis=0)
-                n = len(data_arr_del)
-                Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
-                H_hat = np.zeros((2*(d**2), 1))
+                N = len(data_arr_del)
+                ind_ = model_to_indices(self.bin_path[j])
+                Gamma_hat = np.zeros((len(ind_),len(ind_)))
+                H_hat = np.zeros((len(ind_), 1))
                 for data_ind in range(len(data_arr_del)):
                     x = data_arr_del[data_ind]
-                    G_ = Gamma(x)
+                    G_ = Gamma(x)[np.ix_(ind_,ind_)]
                     Gamma_hat = Gamma_hat + G_
-                    H_ = H(x)
+                    H_ = H(x)[ind_]
                     H_hat = H_hat + H_
-                Gamma_hat = Gamma_hat/n #J_hat in paper
-                H_hat = H_hat/n
+                Gamma_hat = Gamma_hat/N #J_hat in paper
+                H_hat = H_hat/N
                 est_arr = np.linalg.solve(Gamma_hat,H_hat)
-                est_arr = est_arr * self.bin_path[j]
-                smcv += -est_arr.T@H_hat
-            return smcv
+                smcv += est_arr.T@Gamma(data[i])[np.ix_(ind_,ind_)]@est_arr/2 - est_arr.T@H(data[i])[ind_]
+            return smcv.item()
 
-        scores_smvc = Parallel(n_jobs=10)(delayed(calc_SMCV)(j) for j in range(len(self.lambda_list))) #use joblib, causes error
-        opt_index_smvc = scores_smvc.index(min(scores))
+        scores_smcv = Parallel(n_jobs=20)(delayed(calc_SMCV)(j) for j in range(len(self.lambda_list))) #use joblib, causes error
+        opt_index_smcv = scores_smcv.index(min(scores_smcv))
         ### print estimated results
         r_prev = tuple([None for _ in range(6)])
         edge_list = self.reg_path
         for i in range(len(self.lambda_list)):
-            r_new = f"Index number:{i}", self.lambda_list[i],scores[i], f"{len(edge_list[i])} edges", edge_list[i],est_list[i].T.tolist()[0]
-            if self.edge_list[i] == self.edge_list[opt_index]:
+            r_new = f"Index number:{i}", self.lambda_list[i],scores_smcv[i], f"{len(edge_list[i])} edges", edge_list[i]
+            if edge_list[i] == edge_list[opt_index_smcv]:
                 print("[OPTIMAL GRAPH STRUCTURE with the smallest SMIC]")
             if r_new[4] == r_prev[4]:
                 pass
@@ -437,10 +439,102 @@ class Torus_Graph_Model:
                 r_prev = r_new
         
         plt.figure(figsize=(10,10))
-        plt.plot([len(x) for x in edge_list],scores_smvc)
-        plt.savefig("smvc_glasso.png")
+        plt.plot([len(x) for x in edge_list],scores_smcv)
+        plt.savefig("smcv_glasso.png")
         plt.clf()
 
-        import pdb; pdb.set_trace()
+        return opt_index_smcv
     
+    def cross_validation_nolasso(self,data):
+        assert self.naive_est_flag == True
+        d = self.d
+        model1 = [1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0]
+        model2 = [1,1,1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0]
+        model3 = [1,1,1,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1]
+        model4 = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0]
+        model5 = [1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1]
+        model6 = [1,1,1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1]
+        model7 = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        models_ = [model1,model2,model3,model4,model5,model6,model7]
+        models_ = [np.array([m]).T for m in models_]
+
+        # def calc_SMCV(j):
+        #     smcv = 0
+        #     for i in range(len(data)):
+        #         data_arr_del = np.delete(data,obj=i,axis=0)
+        #         n = len(data_arr_del)
+        #         Gamma_hat = np.zeros((2*(d**2),2*(d**2)))
+        #         H_hat = np.zeros((2*(d**2), 1))
+        #         for data_ind in range(len(data_arr_del)):
+        #             x = data_arr_del[data_ind]
+        #             G_ = Gamma(x)
+        #             Gamma_hat = Gamma_hat + G_
+        #             H_ = H(x)
+        #             H_hat = H_hat + H_
+        #         Gamma_hat = Gamma_hat/n #J_hat in paper
+        #         H_hat = H_hat/n
+        #         est_arr = np.linalg.solve(Gamma_hat,H_hat)
+        #         est_arr = est_arr * models_[j]
+        #         smcv += -est_arr.T@H_hat
+        #     return smcv.item()
+
+        def calc_SMCV(j):
+            smcv = 0
+            for i in range(len(data)):
+                data_arr_del = np.delete(data,obj=i,axis=0)
+                N = len(data_arr_del)
+                ind_ = model_to_indices(models_[j])
+                Gamma_hat = np.zeros((len(ind_),len(ind_)))
+                H_hat = np.zeros((len(ind_), 1))
+                for data_ind in range(len(data_arr_del)):
+                    x = data_arr_del[data_ind]
+                    G_ = Gamma(x)[np.ix_(ind_,ind_)]
+                    Gamma_hat = Gamma_hat + G_
+                    H_ = H(x)[ind_]
+                    H_hat = H_hat + H_
+                Gamma_hat = Gamma_hat/N #J_hat in paper
+                H_hat = H_hat/N
+                est_arr = np.linalg.solve(Gamma_hat,H_hat)
+                smcv += est_arr.T@Gamma(data[i])[np.ix_(ind_,ind_)]@est_arr/2 - est_arr.T@H(data[i])[ind_]
+            return smcv.item()
+
+        def calc_SMIC(j):
+            N = len(data)
+            est_arr = self.naive_est
+            ind_ = model_to_indices(models_[j])
+            I = np.zeros((len(ind_),len(ind_)))
+            Gamma_hat = np.zeros((len(ind_),len(ind_)))
+            H_hat = np.zeros((len(ind_), 1))
+            for j in range(N):
+                x = data[j]
+                G_ = Gamma(x)[np.ix_(ind_,ind_)]
+                Gamma_hat = Gamma_hat + G_
+                H_ = H(x)[ind_]
+                H_hat = H_hat + H_
+                tmp = G_ @ est_arr[ind_] - H_
+                I = I + tmp @ tmp.T
+            I = I / N
+            Gamma_hat = Gamma_hat/N
+            H_hat = H_hat/N
+            smic1 = N*(-est_arr[ind_].T@H_hat) 
+            smic1 = smic1.item()
+
+            eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
+            smic2 = sum(eigvals)
+            smic = smic1 + smic2
+            return smic
+
+        scores_smcv = [calc_SMCV(j) for j in range(7)] 
+        scores_smic = [calc_SMIC(j) for j in range(7)] 
+
+        opt_index_smcv = scores_smcv.index(min(scores_smcv))
+        opt_index_smic = scores_smic.index(min(scores_smic))
+
+        print(scores_smcv)
+        print(opt_index_smcv)
+        print(scores_smic)
+        print(opt_index_smic)
+
+        # import pdb; pdb.set_trace()
+        return opt_index_smcv, opt_index_smic
 

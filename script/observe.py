@@ -5,11 +5,14 @@ import pickle
 import matplotlib.pyplot as plt
 import itertools
 import pdb
+import numpy as np
 from constant import get_eeg_filenames, get_electrode_names
 
 def draw_heatmap(M,output_img_path="heatmap.png"): #visualize estimated values in heatmap
     M1 = M.param[:2*M.d].reshape(-1,2).T
-    M2 = M.param[2*M.d:].reshape(-1,4).T
+    
+    # M2 = M.param[2*M.d:].reshape(-1,4).T ###for full model
+    M2 = M.param[2*M.d:].reshape(-1,2).T ###for rotational model
     try:
         M1 = M1.get()
     except:
@@ -19,8 +22,7 @@ def draw_heatmap(M,output_img_path="heatmap.png"): #visualize estimated values i
         M2 = M2.get()
     except:
         pass
-
-    print(M1.shape,M2.shape)
+    M2 = np.concatenate([M2,np.zeros(M2.shape)]) ###for rotational model
     
     fig = plt.figure(figsize=(50,5))
 
@@ -60,15 +62,15 @@ def draw_heatmap(M,output_img_path="heatmap.png"): #visualize estimated values i
 
 if __name__=="__main__":
     exp_id = 1
-    patient_id = 5
-    # patient_state_id = 1
+    patient_id = 3
+    # patient_state_id = 0
     for patient_state_id in [0,1,2,3]:
         ind_list, FILE_NAME_LIST = get_eeg_filenames()
         patient_states = {0:"baseline",1:"mild",2:"moderate",3:"recovery"}
         state_id = ind_list[patient_id][patient_state_id]
         out_id = f"{exp_id}_{patient_id}_{patient_state_id}_{patient_states[patient_state_id]}_{state_id}"
-        filename = f"output/{out_id}_naive"
-        # filename = f"output/{out_id}_glasso"
+        # filename = f"output/{out_id}_naive"
+        filename = f"output/{out_id}_glasso"
 
         with open(f"{filename}.pkl","rb") as f:
             M = pickle.load(f)

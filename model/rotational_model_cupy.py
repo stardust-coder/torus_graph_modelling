@@ -296,22 +296,24 @@ class Torus_Graph_Model:
                 binarr_list.append(B)
             
             def calc_SMIC(j):
-                est_arr = self.naive_est * binarr_list[j]
-                I = np.zeros((self.model_d,self.model_d))
-                Gamma_hat = np.zeros((self.model_d,self.model_d))
-                H_hat = np.zeros((self.model_d, 1))
-                for data_ind in tqdm(range(n)):
-                    x = data[data_ind]
-                    G_ = Gamma(x)
+                N = len(data)
+                est_arr = self.naive_est
+                ind_ = model_to_indices(binarr_list[j].flatten.tolist())
+                I = np.zeros((len(ind_),len(ind_)))
+                Gamma_hat = np.zeros((len(ind_),len(ind_)))
+                H_hat = np.zeros((len(ind_), 1))
+                for j in range(N):
+                    x = data[j]
+                    G_ = Gamma(x)[np.ix_(ind_,ind_)]
                     Gamma_hat = Gamma_hat + G_
-                    H_ = H(x)
+                    H_ = H(x)[ind_]
                     H_hat = H_hat + H_
-                    tmp = G_ @ est_arr - H_
+                    tmp = G_ @ est_arr[ind_] - H_
                     I = I + tmp @ tmp.T
-                I = I / n
-                Gamma_hat = Gamma_hat/n #J_hat in paper
-                H_hat = H_hat/n
-                smic1 = n*(-est_arr.T@H_hat)  #plugged-in optimal estimator to quaratic form
+                Gamma_hat = Gamma_hat/N
+                H_hat = H_hat/N
+                I = I / N
+                smic1 = N*(-est_arr[ind_].T@H_hat) 
                 smic1 = smic1.item()
 
                 I = np.asnumpy(I)
@@ -322,7 +324,7 @@ class Torus_Graph_Model:
                 return smic
 
             # scores = [calc_SMIC(j) for j in range(len(lambda_list))]
-            scores = Parallel(n_jobs=10)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib, causes error
+            scores = Parallel(n_jobs=-1)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib, causes error
 
             opt_index = scores.index(min(scores))
             self.param = est_list[opt_index]

@@ -54,18 +54,30 @@ M.plot(weight=True)
 - lasso : regularization on full parameters equally
 - glasso : regularization on d nodes and on d*(d-1)/2 edges by group
 
+## Run experiment in our paper (61 dimensional EEG phase analysis)
+```
+python script/main.py
+```
+
+## Run comparison SMCV vs SMIC
+```
+python script/crossvalidation.py
+```
 
 ## Acknowledgement
-This repository is partly a reimplementation of [Klein et al, 2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full)
+This repository is partly a reimplementation of [Klein et al, 2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full).
+
+We thank the developers of the EEG dataset [Chennu et al., 2016](https://www.repository.cam.ac.uk/items/b7817912-50b5-423b-882e-978fb39a49df).
 
 
 ## TODO 
-- cupy acceleration ☑️ -> torus_graph_cupy.py
-- higher dimensional data
-- parallel acceleration with conditional distribution based estimation in torus_graph
-- parallel acceleration with conditional distribution based estimation in torus_graph_cupy ☑️
-- dataloader for any data
+- implement dataloader for any data
 
+
+## How to cite
+```
+coming soon...
+```
 
 ---
 
