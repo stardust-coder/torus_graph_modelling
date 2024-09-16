@@ -11,7 +11,7 @@ from scipy.stats import chi2, vonmises
 import sys
 import json
 sys.path.append(".")
-from model.torus_graph import *
+from model.torus_graph_model import *
 
 def core_of_torus_graph(x, phi):
     """

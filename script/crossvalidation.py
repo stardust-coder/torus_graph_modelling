@@ -32,6 +32,7 @@ def CV1():
         M.estimate(data_arr,mode="naive")
         M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(2*M.d*M.d-2*M.d)]
         M.estimate(data_arr,mode="glasso",img_path=f"smic_glasso.png")
+
         opt_index_smcv = M.cross_validation(data_arr)
         e_cv = M.reg_path[opt_index_smcv]
         e_ic = M.G.edges
@@ -55,12 +56,12 @@ def CV2():
         detect_prob_ic[(a,b)] = 0
 
     for _ in tqdm(range(100)):
-        data_arr, _ = sample_from_torus_graph(num_samples=100,d=3,phi=np.array([[0,0,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1]]).T*1, verbose=False)
+        data_arr, _ = sample_from_torus_graph(num_samples=100,d=3,phi=np.array([[0,0,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1]]).T*0.1, verbose=False)
         
         M = Torus_Graph_Model(3)
         M.estimate(data_arr,mode="naive")
         
-        opt_index_smcv, opt_index_smic = M.cross_validation_nolasso(data_arr)
+        opt_index_smcv, opt_index_smic = M.cross_validation_3dim(data_arr)
         models_ = [[(1,2)],[(1,3)],[(2,3)],[(1,2),(1,3)],[(1,2),(2,3)],[(1,3),(2,3)],[(1,2),(1,3),(2,3)]]
         e_cv = models_[opt_index_smcv]
         e_ic = models_[opt_index_smic]

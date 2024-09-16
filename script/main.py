@@ -1,8 +1,13 @@
 import sys
 sys.path.append(".")
-# from model.torus_graph import Torus_Graph_Model
-from model.torus_graph_cupy import Torus_Graph_Model
-from model.rotational_model_cupy import Rotational_Model
+
+use_cupy = False
+if use_cupy:
+    from model.torus_graph_model_cupy import Torus_Graph_Model, Rotational_Model
+else:
+    from model.torus_graph_model import Torus_Graph_Model, Rotational_Model
+
+
 from utils import utils, correlation
 from utils.simulation import sample_from_torus_graph, star_shaped_sample, star_shaped_rotational_sample, bagraph_sample
 from observe import draw_heatmap
@@ -31,7 +36,7 @@ def save(model,output_path):
 
 ###simulation
 # data_arr = bagraph_sample(10000)
-data_arr = star_shaped_sample(1000)
+# data_arr = star_shaped_sample(1000)
 # data_arr = star_shaped_rotational_sample(1000)
 
 # M = Rotational_Model(5)
@@ -39,10 +44,10 @@ data_arr = star_shaped_sample(1000)
 
 # M.estimate(data_arr,mode="naive")
 # print(M.param.T.tolist()[0])
-# M.estimate(data_arr,mode="lasso")
-# print(M.param.T.tolist()[0])
-# M.estimate(data_arr,mode="glasso")
-# print(M.param.T.tolist()[0])
+# # M.estimate(data_arr,mode="lasso")
+# # print(M.param.T.tolist()[0])
+# # M.estimate(data_arr,mode="glasso")
+# # print(M.param.T.tolist()[0])
 # M.glasso_weight = [0 for _ in range(10)] + [1 for _ in range(40)]
 # M.estimate(data_arr,mode="glasso")
 # print(M.param.T.tolist()[0])
@@ -51,9 +56,9 @@ data_arr = star_shaped_sample(1000)
 #Main codes
 ###Load Data
 # data_arr = star_shaped_sample(1000)
-exp_id = 1
-patient_id = 7
-patient_state_id = 3
+exp_id = 2
+patient_id = 10
+patient_state_id = 2
 ind_list, FILE_NAME_LIST = get_eeg_filenames()
 patient_states = {0:"baseline",1:"mild",2:"moderate",3:"recovery"}
 state_id = ind_list[patient_id][patient_state_id]
@@ -73,7 +78,7 @@ M = Rotational_Model(61)
 M.estimate(data_arr,mode="naive")
 save(M,output_path=f"output/{out_id}_naive.pkl")
 draw_heatmap(M,output_img_path=f"output/{out_id}_naive_heatmap.png")
-M.graph_property(abbr=False)
+M.graph_property(abbr=True)
 
 ###LASSO
 # M.estimate(data_arr,mode="lasso",img_path=f"output/{out_id}_lasso.png")
@@ -86,7 +91,7 @@ M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(2*M.d*M.d-2*M.d)
 M.estimate(data_arr,mode="glasso",img_path=f"output/{out_id}_glasso.png")
 save(M,output_path=f"output/{out_id}_glasso.pkl")
 draw_heatmap(M,output_img_path=f"output/{out_id}_glasso_heatmap.png")
-M.graph_property(abbr=False)
+M.graph_property(abbr=True)
 
 #Misc.
 # M.estimate_by_edge(data_arr,mode="lasso")
