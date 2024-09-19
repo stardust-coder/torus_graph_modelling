@@ -1,6 +1,5 @@
 import sys
 sys.path.append(".")
-from model.torus_graph import Torus_Graph_Model
 import pickle
 import matplotlib.pyplot as plt
 import itertools

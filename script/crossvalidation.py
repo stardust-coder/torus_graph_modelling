@@ -1,6 +1,6 @@
 import sys
 sys.path.append(".")
-from model.torus_graph import Torus_Graph_Model
+from model.full_model import Torus_Graph_Model
 from utils import utils, correlation
 from utils.simulation import sample_from_torus_graph, star_shaped_sample, star_shaped_rotational_sample, bagraph_sample
 from observe import draw_heatmap
@@ -55,8 +55,8 @@ def CV2():
         detect_prob_cv[(a,b)] = 0
         detect_prob_ic[(a,b)] = 0
 
-    for _ in tqdm(range(100)):
-        data_arr, _ = sample_from_torus_graph(num_samples=100,d=3,phi=np.array([[0,0,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1]]).T*0.1, verbose=False)
+    for _ in tqdm(range(1000)):
+        data_arr, _ = sample_from_torus_graph(num_samples=100,d=3,phi=np.array([[0,0,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1]]).T*0.2, verbose=False)
         
         M = Torus_Graph_Model(3)
         M.estimate(data_arr,mode="naive")
@@ -105,8 +105,6 @@ def CV2():
 #         detect_23_ic += 1
     
 if "__main__" == __name__:
-    CV1()
-    # CV2()
-
-    import pdb; pdb.set_trace()
+    # CV1()
+    CV2()
 

@@ -17,11 +17,7 @@ from math import sin,cos
 B_list = []
 B_hat_list = []
 B_hat_std_list = []
-
 M = 100
-
-
-
 
 for eps in [0 + 0.01*j for j in range(3)]:
     def mixed_bVM(x,y):
@@ -110,7 +106,6 @@ for eps in [0 + 0.01*j for j in range(3)]:
     
     def estimated_bias():
         N = 1000
-        
         res = []
         for _ in range(M):
             data = sample(N)

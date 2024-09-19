@@ -1,7 +1,7 @@
 import traceback
 import networkx as nx
 import numpy
-import cupy as cp
+import numpy as np
 import scipy
 import itertools
 import matplotlib.pyplot as plt
@@ -11,45 +11,32 @@ from joblib import Parallel, delayed
 import pickle
 import os
 import math
-os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
 
-def S1_j(x): #x : d  dimensional data
-    return cp.array([[cp.cos(x), cp.sin(x)]]).T  # 2x1
+def S(data):
+    def S1_j(x): #x : d  dimensional data
+        return [[math.cos(x)], [math.sin(x)]]  # 2x 1
+    def S1(data):
+        res = []
+        for x in data:
+            res.extend(S1_j(x))
+        return res    
+    def S2_jk(x, j, k):
+        j -= 1
+        k -= 1
+        return [[1*math.cos(x[j] - x[k])],[1*math.sin(x[j] - x[k])]]
+    def S2(data):
+        res = []
+        for v in itertools.combinations([i for i in range(1, len(data) + 1)], 2):
+            res.extend(S2_jk(data, v[0], v[1]))
+        return res
+    
+    print(S1(data))
+    print(S2(data))
 
-
-def S1(data):
-    return cp.concatenate([S1_j(x) for x in data])  # len(data) x 1
-
-
-def S2_jk(x, j, k):
-    j -= 1
-    k -= 1
-    return cp.array(
-        [
-            [
-                cp.cos(x[j] - x[k]),
-                cp.sin(x[j] - x[k]),
-            ]
-        ]
-    ).T
-
-
-def S2(data):
-    d = len(data)
-    l = [i for i in range(1, d + 1)]
-    arrays = []
-    for v in itertools.combinations(l, 2):
-        arrays.append(S2_jk(data, v[0], v[1]))
-    return cp.concatenate(arrays)
-
-
-def S(data): #data : list of len(N)
-    return cp.concatenate([S1(data), S2(data)])
-
-
-# def H(data):
-#     return cp.concatenate([S1(data), 2 * S2(data)])
-
+    res = S1(data)
+    res.extend(S2(data))
+    res = np.array(res)
+    return res
 
 def H(data):
     def S1_j(x): #x : d  dimensional data
@@ -71,7 +58,7 @@ def H(data):
     
     res = S1(data)
     res.extend(S2_2(data))
-    res = cp.array(res)
+    res = np.array(res)
     return res
 
 def D(x): #x : list of len(d), return m x d array
@@ -96,10 +83,7 @@ def D(x): #x : list of len(d), return m x d array
         tmp_[v[0]] = math.cos(x[v[0]] - x[v[1]])
         tmp_[v[1]] = -math.cos(x[v[0]] - x[v[1]])
         entries.append(tmp_)
-    
-    # mat = numpy.array(entries)
-    # mat_cu = cp.asarray(mat)
-    mat_cu = cp.array(entries)
+    mat_cu = np.array(entries)
     return mat_cu
 
 
@@ -109,7 +93,7 @@ def Gamma(x): #x : list of len(d), return mxm array
     return D(x) @ D(x).T
 
 def soft_threshold(param, t_vec):
-    res = cp.zeros(t_vec.shape)
+    res = np.zeros(t_vec.shape)
     for i, t in enumerate(t_vec.flatten().tolist()):
         if t > param:
             res[i][0] = t - param
@@ -120,7 +104,7 @@ def soft_threshold(param, t_vec):
     return res
 
 def shrinkage_operator(param, x):
-    coef = 1 - param/cp.linalg.norm(x).item()
+    coef = 1 - param/np.linalg.norm(x).item()
     if coef < 0:
         coef = 0
     return coef * x
@@ -138,13 +122,15 @@ class Torus_Graph_Model:
 
     def initialize(self):
         self.model_d = self.single_param_dim * self.d + self.pairwise_param_dim * int(self.d*(self.d-1)/2)
-        self.param = cp.zeros((self.model_d,1))
-        self.naive_est = cp.zeros((self.model_d,1))
+        self.param = np.zeros((self.model_d,1))
+        self.naive_est = np.zeros((self.model_d,1))
         self.naive_est_flag = False
 
         #Calculate matrices
-        self.Gamma_hat =  cp.zeros((self.model_d,1))
-        self.H_hat = cp.zeros((self.model_d,1))
+        self.Gamma_hat =  np.zeros((self.model_d,1))
+        self.H_hat = np.zeros((self.model_d,1))
+        self.D_list = []
+        self.H_list = []
 
         self.smic = []
         self.reg_path = []
@@ -157,7 +143,7 @@ class Torus_Graph_Model:
         self.pos = nx.circular_layout(self.G)
 
         #for SMIC calculations
-        self.lambda_list = cp.logspace(-2, 1, num=30).tolist()
+        self.lambda_list = np.linspace(0, 1, num=10).tolist()
         self.glasso_weight = [1 for _ in range(self.model_d)] #weight of regularization on each group
         self.thresh = 1e-4
         self.index_dictionary = {}
@@ -186,7 +172,7 @@ class Torus_Graph_Model:
     def get_param(self,t):
         return self.get_param_of_vec(t,self.param)
 
-    def estimate_by_edge(self, data, mode="naive"): #TODO: implement conditional distribution based parallel estimation
+    def estimate_by_edge(self, data, mode="naive"): #TODO: implement conditional distribution based parallel estimation. idk if its useful.
         n, d = data.shape
         start_estimation = time()
 
@@ -210,8 +196,8 @@ class Torus_Graph_Model:
         def est_one_edge(a, b):
             d = self.d
             index = get_indices(d,a,b)
-            Gamma_hat_small = cp.zeros((8 * (d - 1), 8 * (d - 1)))
-            H_hat = cp.zeros((self.model_d, 1))
+            Gamma_hat_small = np.zeros((8 * (d - 1), 8 * (d - 1)))
+            H_hat = np.zeros((self.model_d, 1))
             for j in range(n):
                 x = data[j]
                 D_small = D(x)[index, :]
@@ -220,15 +206,15 @@ class Torus_Graph_Model:
                 H_hat = H_hat + tmp_
             Gamma_hat_small = Gamma_hat_small / n
             H_hat = H_hat / n
-            est_ = cp.linalg.solve(Gamma_hat_small, H_hat[index]) #cp.linalg.inv(Gamma_hat_small) @ H_hat[index]
+            est_ = np.linalg.solve(Gamma_hat_small, H_hat[index]) #np.linalg.inv(Gamma_hat_small) @ H_hat[index]
             self.param[index] = est_
             return est_
 
-        ####idk which one is faster in higher dimensions
+        ### idk which one is faster in higher dimensions.
         # for i, v in enumerate(itertools.combinations(range(1, d + 1), 2)):
         #     est_one_edge(v[0],v[1])
         #     print("Estimation for:", v)
-        
+        ### Use joblib.
         tmp = Parallel(n_jobs=-1,require='sharedmem')(delayed(est_one_edge)(v[0],v[1]) for v in itertools.combinations(range(1, d + 1), 2)) #use joblib, slow because it uses shared memory
 
         end_estimation = time()
@@ -241,9 +227,9 @@ class Torus_Graph_Model:
         start_estimation = time()
 
         def calc_matrices(data): 
-            Gamma_hat = cp.zeros((self.model_d, self.model_d))
-            H_hat = cp.zeros((self.model_d, 1))
-            V_zero_hat = cp.zeros((self.model_d, self.model_d)) 
+            Gamma_hat = np.zeros((self.model_d, self.model_d))
+            H_hat = np.zeros((self.model_d, 1))
+            V_zero_hat = np.zeros((self.model_d, self.model_d)) 
             #TODO: takes time, need acceleration
             for j in tqdm(range(n)): 
                 x = data[j]
@@ -257,21 +243,22 @@ class Torus_Graph_Model:
             return Gamma_hat, H_hat
 
         def calc_Gamma_hat(data): 
-            pool = cp.cuda.MemoryPool(cp.cuda.malloc_managed)
-            cp.cuda.set_allocator(pool.malloc)
-            D_concat = cp.empty((self.model_d,self.d*n))
+            D_concat = np.empty((self.model_d,self.d*n))
             for j in tqdm(range(n)):
-                D_concat[:,self.d*j:self.d*(j+1)] = D(data[j])/(n**0.5) #0.05s
+                D_ = D(data[j])
+                self.D_list.append(D_)
+                D_concat[:,self.d*j:self.d*(j+1)] = D_/(n**0.5) #0.05s
             Gamma_hat = D_concat@D_concat.T
-            
             del D_concat
             return Gamma_hat
         
         def calc_H_hat(data):
-            H_concat = cp.empty((self.model_d,n))
+            H_concat = np.empty((self.model_d,n))
             for j in tqdm(range(n)):
-                H_concat[:,j:j+1]= H(data[j])/n
-            H_hat = H_concat@cp.ones((n,1))
+                H_ = H(data[j])
+                self.H_list.append(H_)
+                H_concat[:,j:j+1]= H_/n
+            H_hat = H_concat@np.ones((n,1))
             del H_concat
             return H_hat
 
@@ -279,7 +266,8 @@ class Torus_Graph_Model:
             print("Running naive estimation...")
             self.H_hat = calc_H_hat(data)
             self.Gamma_hat = calc_Gamma_hat(data)
-            self.param = cp.linalg.solve(self.Gamma_hat,self.H_hat) #cp.linalg.inv(Gamma_hat)@H_hat 
+
+            self.param = np.linalg.solve(self.Gamma_hat,self.H_hat) #np.linalg.inv(Gamma_hat)@H_hat 
             self.naive_est = self.param.copy()
             self.naive_est_flag = True
             print("\nEstimated parameters:\n")
@@ -290,13 +278,13 @@ class Torus_Graph_Model:
             d = self.d
             assert self.naive_est_flag != False
             
-            x_admm = cp.zeros((self.model_d, 1))  # warm start
-            z_admm = cp.zeros((self.model_d, 1))
-            u_admm = cp.zeros((self.model_d, 1))
-            z_new = cp.zeros((self.model_d, 1))
+            x_admm = np.zeros((self.model_d, 1))  # warm start
+            z_admm = np.zeros((self.model_d, 1))
+            u_admm = np.zeros((self.model_d, 1))
+            z_new = np.zeros((self.model_d, 1))
 
             mu = 1  # hyperparameter
-            INV = cp.linalg.inv(mu * cp.identity(self.model_d) + self.Gamma_hat)
+            INV = np.linalg.inv(mu * np.identity(self.model_d) + self.Gamma_hat)
             est_list = []
             edge_list = []
             binarr_list = []
@@ -305,7 +293,7 @@ class Torus_Graph_Model:
                 iter_ = 10000# 1ならapproxiamte, 大きく設定したほうがexactに近い
                 for _ in range(iter_):
                     x_new = INV @ (mu * (z_admm - u_admm) + self.H_hat)
-                    x_dif = cp.linalg.norm(x_new - x_admm)
+                    x_dif = np.linalg.norm(x_new - x_admm)
                     if mode=="lasso":
                         z_new = soft_threshold(l / mu, x_new + u_admm)
                     elif mode=="glasso":
@@ -319,8 +307,8 @@ class Torus_Graph_Model:
                         for _ in range(int(d*(d-1)/2)):
                             z_new[tmp:tmp+inc] = shrinkage_operator(self.glasso_weight[tmp]*l / mu, x_new[tmp:tmp+inc] + u_admm[tmp:tmp+inc])
                             tmp += inc
-                    z_dif = cp.linalg.norm(z_new - z_admm)
-                    r_dif = cp.linalg.norm(x_new - z_new)
+                    z_dif = np.linalg.norm(z_new - z_admm)
+                    r_dif = np.linalg.norm(x_new - z_new)
                     u_new = u_admm + x_new - z_new
                     x_admm = x_new.copy()
                     z_admm = z_new.copy()
@@ -331,27 +319,33 @@ class Torus_Graph_Model:
                 est_with_admm_onestep = z_admm.copy()
                 est_list.append(est_with_admm_onestep)
                 E = []
-                B = cp.ones((self.model_d,1))
+                B = np.ones((self.model_d,1))
                 for e in list(itertools.combinations(range(1, self.d + 1), 2)):
-                    if cp.linalg.norm(self.get_param_of_vec((e[0],e[1]),est_with_admm_onestep)) > self.thresh:
+                    if np.linalg.norm(self.get_param_of_vec((e[0],e[1]),est_with_admm_onestep)) > self.thresh:
                         E.append(e)
                     else:
                         ind = self.index_dictionary[e]
                         B[self.single_param_dim*d+self.pairwise_param_dim*(ind-1):self.single_param_dim*d+self.pairwise_param_dim*ind] = 0
                 edge_list.append(E)
                 binarr_list.append(B)
-            
+
+            I_concat = np.empty((self.model_d,n))
+            for j in tqdm(range(n)):
+                I_concat[:,j:j+1] = ((self.D_list[j])@(self.D_list[j].T @ self.naive_est) - self.H_list[j])/(n**0.5)
+            I_full = I_concat@I_concat.T
+
             def calc_SMIC(j):
                 est_arr = self.naive_est
                 ind_ = model_to_indices(binarr_list[j].flatten().tolist())
 
-                #TODO: acccelerate
-                # I = cp.zeros((len(ind_),len(ind_)))
-                # Gamma_hat = cp.zeros((len(ind_),len(ind_)))
-                # H_hat = cp.zeros((len(ind_), 1))
+                ### Naive summation, very slow
+                # N = n
+                # I = np.zeros((len(ind_),len(ind_)))
+                # Gamma_hat = np.zeros((len(ind_),len(ind_)))
+                # H_hat = np.zeros((len(ind_), 1))
                 # for j in range(N): #TODO: accelerate
                 #     x = data[j]
-                #     G_ = Gamma(x)[cp.ix_(ind_,ind_)]
+                #     G_ = Gamma(x)[np.ix_(ind_,ind_)]
                 #     Gamma_hat = Gamma_hat + G_
                 #     H_ = H(x)[ind_]
                 #     H_hat = H_hat + H_
@@ -363,27 +357,23 @@ class Torus_Graph_Model:
                 # smic1 = N*(-est_arr[ind_].T@H_hat) 
                 # smic1 = smic1.item()
 
-                #TODO: matrix multiplications
+                ### Matrix multiplication, very fast
                 smic1 = n*(-est_arr[ind_].T@self.H_hat[ind_]) 
-                smic1 = smic1.item()
-                I_concat = cp.empty((len(ind_),n))
-                for j in range(n):
-                    I_concat[:,j:j+1] = Gamma(data[j])[cp.ix_(ind_,ind_)] @ est_arr[ind_] - H(data[j])[ind_]
-                I = I_concat@I_concat.T
-                I = cp.asnumpy(I)
-                Gamma_hat = cp.asnumpy(Gamma_hat)
-                eigvals = scipy.linalg.eigh(I,Gamma_hat,eigvals_only=True)
+                smic1 = smic1.item()    
+                eigvals = scipy.linalg.eigh(I_full[np.ix_(ind_,ind_)],self.Gamma_hat[np.ix_(ind_,ind_)],eigvals_only=True)
                 smic2 = sum(eigvals) ### tr(IJ^-1)
-                smic = smic1 + smic2
+                smic = smic1 + smic2 * 2
+                
+                print("SMICの内訳",smic1, smic2*2)
                 return smic
 
-            # scores = [calc_SMIC(j) for j in range(len(lambda_list))]
-            scores = Parallel(n_jobs=-1)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib, causes error
+            # scores = [calc_SMIC(j) for j in range(len(lambda_list))] # no use of joblib. 
+            scores = Parallel(n_jobs=-1)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib.
 
             opt_index = scores.index(min(scores))
             self.param = est_list[opt_index]
 
-            ### print estimated results
+            ### Print estimated results
             r_prev = tuple([None for _ in range(6)])
             for i in range(len(lambda_list)):
                 r_new = f"Index number:{i}", lambda_list[i],scores[i], f"{len(edge_list[i])} edges", edge_list[i],est_list[i].T.tolist()[0]
@@ -393,15 +383,18 @@ class Torus_Graph_Model:
                 if r_new[4] == r_prev[4]:
                     pass
                 else:
-                    print(r_new)
+                    # print(r_new)
+                    print(r_new[:4])
                     r_prev = r_new
             
             plt.figure(figsize=(10,10))
             plt.plot([len(x) for x in edge_list],scores)
+            while os.path.isfile(img_path) == True:
+                img_path = img_path.replace(".png","") + "_" + ".png"
             plt.savefig(img_path)
             plt.clf()
             
-            ### save results to model
+            ### Save results to model
             self.smic = scores
             self.est_path = est_list
             self.reg_path = edge_list
@@ -416,9 +409,9 @@ class Torus_Graph_Model:
     
     def param_to_graph(self):
         for e in list(itertools.combinations(range(1, self.d + 1), 2)):
-            weight = cp.linalg.norm(self.get_param((e[0],e[1])))
+            weight = np.linalg.norm(self.get_param((e[0],e[1])))
             if weight > self.thresh:
-                self.G.add_edge(e[0],e[1],weight=weight.get().item())
+                self.G.add_edge(e[0],e[1],weight=weight)
             else:
                 try:
                     self.G.remove_edge(e[0],e[1])

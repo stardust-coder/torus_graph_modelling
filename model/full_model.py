@@ -12,6 +12,28 @@ import pickle
 import os
 import math
 
+def S(data):
+    def S1_j(x): #x : d  dimensional data
+        return [[math.cos(x)], [math.sin(x)]]  # 2x 1
+    def S1(data):
+        res = []
+        for x in data:
+            res.extend(S1_j(x))
+        return res    
+    def S2_jk(x, j, k):
+        j -= 1
+        k -= 1
+        return [[1*math.cos(x[j] - x[k])],[1*math.sin(x[j] - x[k])],[1*math.cos(x[j] + x[k])],[1*math.sin(x[j] + x[k])]]
+    def S2(data):
+        res = []
+        for v in itertools.combinations([i for i in range(1, len(data) + 1)], 2):
+            res.extend(S2_jk(data, v[0], v[1]))
+        return res
+    res = S1(data)
+    res.extend(S2(data))
+    res = np.array(res)
+    return res
+
 def H(data):
     def S1_j(x): #x : d  dimensional data
         return [[math.cos(x)], [math.sin(x)]]  # 2x 1
@@ -23,7 +45,7 @@ def H(data):
     def S2_2_jk(x, j, k):
         j -= 1
         k -= 1
-        return [[2*math.cos(x[j] - x[k])],[2*math.sin(x[j] - x[k])]]
+        return [[2*math.cos(x[j] - x[k])],[2*math.sin(x[j] - x[k])],[2*math.cos(x[j] + x[k])],[2*math.sin(x[j] + x[k])]]
     def S2_2(data):
         res = []
         for v in itertools.combinations([i for i in range(1, len(data) + 1)], 2):
@@ -57,11 +79,19 @@ def D(x): #x : list of len(d), return m x d array
         tmp_[v[0]] = math.cos(x[v[0]] - x[v[1]])
         tmp_[v[1]] = -math.cos(x[v[0]] - x[v[1]])
         entries.append(tmp_)
-    mat_cu = np.array(entries)
-    return mat_cu
 
+        tmp_ = [0 for _ in range(d)]
+        tmp_[v[0]] = -math.sin(x[v[0]] + x[v[1]])
+        tmp_[v[1]] = -math.sin(x[v[0]] + x[v[1]])
+        entries.append(tmp_)
 
+        tmp_ = [0 for _ in range(d)]
+        tmp_[v[0]] = math.cos(x[v[0]] + x[v[1]])
+        tmp_[v[1]] = math.cos(x[v[0]] + x[v[1]])
+        entries.append(tmp_)
 
+    mat_arr = np.array(entries)
+    return mat_arr
 
 def Gamma(x): #x : list of len(d), return mxm array
     return D(x) @ D(x).T
@@ -336,7 +366,7 @@ class Torus_Graph_Model:
                 smic1 = smic1.item()    
                 eigvals = scipy.linalg.eigh(I_full[np.ix_(ind_,ind_)],self.Gamma_hat[np.ix_(ind_,ind_)],eigvals_only=True)
                 smic2 = sum(eigvals) ### tr(IJ^-1)
-                smic = smic1 + smic2
+                smic = smic1 + smic2 * 2
                 return smic
 
             # scores = [calc_SMIC(j) for j in range(len(lambda_list))] # no use of joblib. 
@@ -427,9 +457,66 @@ class Torus_Graph_Model:
         plt.show()
         plt.savefig(img_path)
 
-class Rotational_Model(Torus_Graph_Model):
-    def __init__(self,dim):
-        super().__init__(dim)
-        self.single_param_dim = 2
-        self.pairwise_param_dim = 2
-        self.initialize()
+    def cross_validation_3dim(self,data):
+        assert self.naive_est_flag == True
+        n,d = data.shape
+        model1 = [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0]
+        model2 = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0]
+        model3 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]
+        model4 = [0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0]
+        model5 = [0,0,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1]
+        model6 = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]
+        model7 = [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1]
+        models_ = [model1,model2,model3,model4,model5,model6,model7]
+        models_ = [np.array([m]).T for m in models_]
+
+        def calc_SMCV(j):
+            smcv = 0
+            for i in range(len(data)):
+                data_arr_del = np.delete(data,obj=i,axis=0)
+                N = len(data_arr_del)
+                ind_ = model_to_indices(models_[j])
+                Gamma_hat = np.zeros((len(ind_),len(ind_)))
+                H_hat = np.zeros((len(ind_), 1))
+                for data_ind in range(len(data_arr_del)):
+                    x = data_arr_del[data_ind]
+                    G_ = Gamma(x)[np.ix_(ind_,ind_)]
+                    Gamma_hat = Gamma_hat + G_
+                    H_ = H(x)[ind_]
+                    H_hat = H_hat + H_
+                Gamma_hat = Gamma_hat/N #J_hat in paper
+                H_hat = H_hat/N
+                est_arr = np.linalg.solve(Gamma_hat,H_hat)
+                smcv += est_arr.T@Gamma(data[i])[np.ix_(ind_,ind_)]@est_arr/2 - est_arr.T@H(data[i])[ind_]
+            return smcv.item()
+
+        I_concat = np.empty((self.model_d,n))
+        for j in tqdm(range(n)):
+            I_concat[:,j:j+1] = ((self.D_list[j])@(self.D_list[j].T @ self.naive_est) - self.H_list[j])/(n**0.5)
+        I_full = I_concat@I_concat.T
+
+        def calc_SMIC(j):
+            est_arr = self.naive_est
+            ind_ = model_to_indices(models_[j])
+            ### Matrix multiplication, very fast
+            smic1 = n*(-est_arr[ind_].T@self.H_hat[ind_]) 
+            smic1 = smic1.item()    
+            eigvals = scipy.linalg.eigh(I_full[np.ix_(ind_,ind_)],self.Gamma_hat[np.ix_(ind_,ind_)],eigvals_only=True)
+            smic2 = sum(eigvals) ### tr(IJ^-1)
+            smic = smic1 + smic2*2
+            return smic
+
+        scores_smcv = [calc_SMCV(j) for j in range(7)] 
+        scores_smic = [calc_SMIC(j) for j in range(7)] 
+
+        opt_index_smcv = scores_smcv.index(min(scores_smcv))
+        opt_index_smic = scores_smic.index(min(scores_smic))
+
+        print(scores_smcv)
+        print(opt_index_smcv)
+        print(scores_smic)
+        print(opt_index_smic)
+
+        # import pdb; pdb.set_trace()
+        return opt_index_smcv, opt_index_smic
+    
