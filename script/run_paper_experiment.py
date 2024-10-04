@@ -20,8 +20,12 @@ import matplotlib.pyplot as plt
 import pickle
 
 def save(model,output_path):
-        with open(output_path, 'wb') as f:
-            pickle.dump(model, f)
+    model.Gamma_hat =  None
+    model.H_hat = None
+    model.D_list = None
+    model.H_list = None
+    with open(output_path, 'wb') as f:
+        pickle.dump(model, f)
 
 def run(exp_id,patient_id,patient_state_id):
     ind_list, FILE_NAME_LIST = get_eeg_filenames()
@@ -49,9 +53,17 @@ def run(exp_id,patient_id,patient_state_id):
     for _ in range(6):
         M.estimate(data_arr,mode="glasso",img_path=f"output/{out_id}_glasso.png")
         opt_index = M.smic.index(min(M.smic))
+        if opt_index == 0 or opt_index == 9:
+            break
         M.lambda_list = np.linspace(M.lambda_list[opt_index-1],M.lambda_list[opt_index+1],10)
     draw_heatmap(M,output_img_path=f"output/{out_id}_glasso_heatmap.png")
     M.graph_property(abbr=True)
+    save(M,output_path=f"output/{out_id}_glasso_model.pkl")
+
+    print("=" * 30)
+    print(M.G.edges) #推定された辺
+    print(M.G.degree())#次数の分布
+    print("=" * 30)
 
 if __name__ == "__main__":
     import argparse    # 1. argparseをインポート

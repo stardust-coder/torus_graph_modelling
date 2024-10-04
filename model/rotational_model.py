@@ -405,6 +405,9 @@ class Torus_Graph_Model:
 
         end_estimation = time()
         self.param_to_graph()
+
+        print("\nEstimated parameters:\n")
+        print(self.param.T.tolist()[0])
         print("Estimation time(s):",end_estimation-start_estimation)
     
     def param_to_graph(self):
@@ -418,7 +421,7 @@ class Torus_Graph_Model:
                 except:
                     pass
 
-    def graph_property(self,abbr=True):
+    def graph_property(self, abbr=True):
         if not abbr:
             print("Average clustering coefficient = ", nx.average_clustering(self.G))
             print("Average shortest path length = ", nx.average_shortest_path_length(self.G))

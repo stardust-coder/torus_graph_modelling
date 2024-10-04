@@ -27,13 +27,11 @@ def CV1():
     for _ in tqdm(range(100)):
         data_arr = star_shaped_sample(N=100)
         M = Torus_Graph_Model(5)
-        M.lambda_list = np.logspace(-2, 1, num=100).tolist()
-
         M.estimate(data_arr,mode="naive")
         M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(2*M.d*M.d-2*M.d)]
         M.estimate(data_arr,mode="glasso",img_path=f"smic_glasso.png")
 
-        opt_index_smcv = M.cross_validation(data_arr)
+        opt_index_smcv, opt_index_smic = M.cross_validation(data_arr)
         e_cv = M.reg_path[opt_index_smcv]
         e_ic = M.G.edges
         for a,b in itertools.combinations(l, 2):
@@ -70,41 +68,10 @@ def CV2():
                 detect_prob_cv[(a,b)] = detect_prob_cv[(a,b)]+1
             if (a,b) in e_ic:
                 detect_prob_ic[(a,b)] = detect_prob_ic[(a,b)]+1
-
-        
-
     print(detect_prob_cv)
     print(detect_prob_ic)
-
-# detect_12_cv = 0
-# detect_13_cv = 0
-# detect_23_cv = 0
-# detect_12_ic = 0
-# detect_13_ic = 0
-# detect_23_ic = 0
-# for _ in tqdm(range(1000)):
-#     data_arr, _ = sample_from_torus_graph(num_samples=1000,d=3,phi=np.array([[0,0,0,0,0,0,0.1,0.1,0.1,0.1,0,0,0,0,0.1,0.1,0.1,0.1]]).T, verbose=False)
-#     M = Torus_Graph_Model(3)
-#     M.estimate(data_arr,mode="naive")
-#     M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(2*M.d*M.d-2*M.d)]
-#     M.estimate(data_arr,mode="glasso",img_path=f"smic_glasso.png")
-#     opt_index_smcv = M.cross_validation(data_arr)
-#     e_cv = M.reg_path[opt_index_smcv]
-#     e_ic = M.G.edges
-#     if (1,2) in e_cv:
-#         detect_12_cv += 1
-#     if (1,3) in e_cv:
-#         detect_13_cv += 1
-#     if (2,3) in e_cv:
-#         detect_23_cv += 1
-#     if (1,2) in e_ic:
-#         detect_12_ic += 1
-#     if (1,3) in e_ic:
-#         detect_13_ic += 1
-#     if (2,3) in e_ic:
-#         detect_23_ic += 1
     
 if "__main__" == __name__:
-    # CV1()
-    CV2()
+    CV1()
+    # CV2()
 

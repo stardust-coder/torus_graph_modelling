@@ -147,7 +147,7 @@ class Torus_Graph_Model:
         self.pos = nx.circular_layout(self.G)
 
         #for SMIC calculations
-        self.lambda_list = np.logspace(-2, 1, num=30).tolist()
+        self.lambda_list = np.linspace(0, 1, num=100).tolist()
         self.glasso_weight = [1 for _ in range(self.model_d)] #weight of regularization on each group
         self.thresh = 1e-4
         self.index_dictionary = {}
@@ -457,18 +457,20 @@ class Torus_Graph_Model:
         plt.show()
         plt.savefig(img_path)
 
-    def cross_validation_3dim(self,data):
+    def cross_validation(self,data):
         assert self.naive_est_flag == True
         n,d = data.shape
-        model1 = [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0]
-        model2 = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0]
-        model3 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]
-        model4 = [0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0]
-        model5 = [0,0,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1]
-        model6 = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]
-        model7 = [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1]
-        models_ = [model1,model2,model3,model4,model5,model6,model7]
-        models_ = [np.array([m]).T for m in models_]
+        # model1 = [0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0]
+        # model2 = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0]
+        # model3 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]
+        # model4 = [0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0]
+        # model5 = [0,0,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1]
+        # model6 = [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]
+        # model7 = [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1]
+        # models_ = [model1,model2,model3,model4,model5,model6,model7]
+        # models_ = [np.array([m]).T for m in models_]
+
+        models_ = self.bin_path
 
         def calc_SMCV(j):
             smcv = 0
@@ -506,8 +508,8 @@ class Torus_Graph_Model:
             smic = smic1 + smic2*2
             return smic
 
-        scores_smcv = [calc_SMCV(j) for j in range(7)] 
-        scores_smic = [calc_SMIC(j) for j in range(7)] 
+        scores_smcv = [calc_SMCV(j) for j in range(len(models_))] 
+        scores_smic = [calc_SMIC(j) for j in range(len(models_))] 
 
         opt_index_smcv = scores_smcv.index(min(scores_smcv))
         opt_index_smic = scores_smic.index(min(scores_smic))
@@ -516,7 +518,5 @@ class Torus_Graph_Model:
         print(opt_index_smcv)
         print(scores_smic)
         print(opt_index_smic)
-
-        # import pdb; pdb.set_trace()
         return opt_index_smcv, opt_index_smic
     

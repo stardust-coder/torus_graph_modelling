@@ -17,8 +17,6 @@ def PLV(sig1, sig2):
     return np.abs(z)
 
 # バターワースフィルタ（バンドパス）
-
-
 def bandpass(x, samplerate, fp, fs=np.array([0, 6000]), gpass=3, gstop=40):
     fn = samplerate / 2  # ナイキスト周波数
     wp = fp / fn  # ナイキスト周波数で通過域端周波数を正規化
@@ -38,8 +36,6 @@ def get_bandpass(data, start, end):
     return bandpass(data, samplerate, fp, fs, gpass, gstop)
 
 # ヒルベルト変換
-
-
 def hilbert_transform(signal, dt=1e-4, verbose=False):
     '''
     signal : np.array with shape (len,)

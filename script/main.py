@@ -58,8 +58,8 @@ def save(model,output_path):
 #Main codes
 ###Load Data
 # data_arr = star_shaped_sample(1000)
-exp_id = 4
-patient_id = 6
+exp_id = 5
+patient_id = 20
 patient_state_id = 0
 ind_list, FILE_NAME_LIST = get_eeg_filenames()
 patient_states = {0:"baseline",1:"mild",2:"moderate",3:"recovery"}
