@@ -7,4 +7,3 @@ tqdm
 mne
 networkx
 joblib
-cupy

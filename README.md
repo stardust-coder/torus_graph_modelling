@@ -38,7 +38,7 @@ M.estimate(data_arr,mode="naive")
 M.plot(weight=True)
 ```
 
-With Cupy(GPU) acceleration
+With Cupy(GPU) acceleration [not recommended]
 ```python
 import sys
 sys.path.append(".")
@@ -56,10 +56,24 @@ M.plot(weight=True)
 - lasso : regularization on full parameters equally
 - glasso : regularization on d nodes and on d*(d-1)/2 edges by group (Group LASSO)
 
+## Run Group LASSO
+```python
+M.lambda_list = [0] + np.logspace(-3,0.5, num=99).tolist() #recommended canditate set of lambdas
+M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(2*M.d*M.d-2*M.d)] #recommended weight setting of regularization terms
+M.estimate(data_arr,mode="glasso")
+```
+
 ## Run experiment in our paper (61 dimensional EEG phase analysis)
 ```
 python script/main.py
+#or
+python script/run_paper_experiment.py -e 0 -p 2 -s 0
 ```
+Sequence task
+```
+bash run.sh
+```
+
 
 ## Run comparison SMCV vs SMIC
 CV1() runs 5 dimensional Group LASSO.  (100 candidates)
@@ -71,7 +85,8 @@ python script/crossvalidation.py
 
 ## Visualize reconstucted graph
 Set path to load.
-```script/view_graph.py
+```python
+#script/view_graph.py
 ...
 filename = "PATH TO YOUR PKL FILE"
 ...

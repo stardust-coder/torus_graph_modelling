@@ -16,7 +16,7 @@ responsive = [2,5,9,13,18,20,22,23,24,27,28,29]
 state = ["baseline","mild","moderate","recovery"]
 
 ### Specify df (csv)
-# df = pd.read_csv("/home/sukeda/torus_graph_modelling/output/estimate_phi_admmpath/beta/result-top100.csv")
+# df = <YOUR_CSV_FILE>
 def view_ave_cluster():
     for d in drowsy:
         plt.plot(state,df[df["patient_id"]==d]["ave_cluster"].tolist(),color="blue")
@@ -105,8 +105,7 @@ if __name__=="__main__":
         ch_pos = get_eeg_position()
         ch_pos = {k:[v[0],-v[1]] for (k,v) in ch_pos.items()}
         group = "drowsy" if patient_id in drowsy else "responsive"
-
-        filename = f"/home/sukeda/torus_graph_modelling/output/61dim_25000data_rotational_6/{group}/{patient_id}/6_{patient_id}_{patient_state_id}_{patient_states[patient_state_id]}_{state_id}_glasso_model.pkl"
+        filename = f"./output/0_{patient_id}_{patient_state_id}_{patient_states[patient_state_id]}_{state_id}_glasso_model.pkl"
         with open(filename, "rb") as f:
             M = pickle.load(f)
 
@@ -115,24 +114,6 @@ if __name__=="__main__":
         for i in range(1,62):
             mapping[i] = ch_names[i-1]
         H = nx.relabel_nodes(M.G, mapping)
-
-        # ###DSP
-        # DS = charikar_algorithm(H.copy())
-        # pr = nx.pagerank(H)
-        # colors = []
-        # for name in ch_names:
-        #     if name in list(DS.nodes):
-        #         colors.append("yellow")
-        #     else:
-        #         colors.append("white")
-        
-        # ###Clauset-Newman-Moore greedy modularity maximization
-        # c = nx.community.greedy_modularity_communities(H)
-        # colors = []
-        # for name in ch_names:
-        #     for k in range(len(c)):
-        #         if name in c[k]:
-        #             colors.append(color_list[k])
         
         ### Modularity maximization by Louvain
         c = nx.community.louvain_communities(H, seed=123)
@@ -143,7 +124,7 @@ if __name__=="__main__":
                     colors.append(color_list[k])
 
         ###Degrees
-        degrees = np.array([d for n, d in H.degree()])
+        degrees = np.array([d for _, d in H.degree()])
         sizes = degrees**2 
         cmap = plt.get_cmap("Pastel1")
         node_color = [cmap(i) for i in range(H.number_of_nodes())]
@@ -165,10 +146,10 @@ if __name__=="__main__":
         plt.show()
         plt.savefig(f"{patient_id}-{patient_state_id}-degree.png")
         
-
-    draw(7,0)
-    draw(7,1)
-    draw(7,2)
-    draw(7,3)
+    draw(3,0)
+    # draw(7,0)
+    # draw(7,1)
+    # draw(7,2)
+    # draw(7,3)
     
     

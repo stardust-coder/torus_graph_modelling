@@ -11,7 +11,7 @@ from scipy.stats import chi2, vonmises
 import sys
 import json
 sys.path.append(".")
-from model.full_model import *
+from model.torus_graph_model import *
 
 def core_of_torus_graph(x, phi):
     """
@@ -64,18 +64,6 @@ def sample_from_torus_graph(num_samples, d, phi, verbose=True):
     if verbose:
         print("acceptance rate:", acceptance / trial)
     return np.concatenate(samples, axis=1).T, acceptance / trial
-
-
-# def gibbs_sample_from_torus_graph(N,d,phi):
-#     samples = []
-#     sample = [0 for _ in range(d)]
-#     for _ in range(N+burnin):
-#         for j in range(d):
-#             loc = #TODO
-#             kappa = #TODO
-#             sample[j] = vonmises(loc=loc, kappa=kappa).rvs(1)
-#         samples.append(sample)
-#     return np.concatenate(samples[burnin:], axis=1).T, None
 
 
 def torus_graph_density(phi, x1, x2):

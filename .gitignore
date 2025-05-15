@@ -4,3 +4,4 @@ pickles
 */__pycache__
 *.log
 *.png
+notebook/

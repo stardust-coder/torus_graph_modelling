@@ -143,7 +143,7 @@ class Torus_Graph_Model:
         self.pos = nx.circular_layout(self.G)
 
         #for SMIC calculations
-        self.lambda_list = np.linspace(0, 1, num=10).tolist()
+        self.lambda_list = np.linspace(0, 2, num=10).tolist()
         self.glasso_weight = [1 for _ in range(self.model_d)] #weight of regularization on each group
         self.thresh = 1e-4
         self.index_dictionary = {}
@@ -388,7 +388,7 @@ class Torus_Graph_Model:
                     r_prev = r_new
             
             plt.figure(figsize=(10,10))
-            plt.plot([len(x) for x in edge_list],scores)
+            plt.plot([len(x) for x in edge_list],scores, "-o")
             while os.path.isfile(img_path) == True:
                 img_path = img_path.replace(".png","") + "_" + ".png"
             plt.savefig(img_path)

@@ -1,26 +1,19 @@
 import numpy as np
 import mne
 from mne.viz import ClickableImage, plot_alignment, set_3d_view, snapshot_brain_montage
+import matplotlib.pyplot as plt
+import itertools
 
-id = "003"
-# load human eeg data series from PlosComp journal
-FILE_NAME= f"02-2010-anest 20100210 135.{id}"
+FILE_NAME= f"02-2010-anest 20100210 135.003"
 PATH_TO_DATA_DIR = "../../data/Sedation-RestingState/"
 PATH_TO_DATA = PATH_TO_DATA_DIR + FILE_NAME + ".set"
+raw = mne.io.read_epochs_eeglab(
+            PATH_TO_DATA, verbose=False, montage_units="cm")
 
-def load_human_eeg(input_fname, events=None):
-    data = mne.io.read_epochs_eeglab(
-            input_fname, verbose=False, montage_units="cm")
-    return data
-
-raw = load_human_eeg(PATH_TO_DATA)
-
-#montage = raw.get_montage()
-#fig = plot_alignment(raw.info)
-#set_3d_view(figure=fig, azimuth=20, elevation=80)
-#xy,im = snapshot_brain_montage(fig,montage)
-
-
+montage = raw.get_montage()
+fig = plot_alignment(raw.info)
+set_3d_view(figure=fig, azimuth=20, elevation=80)
+xy,im = snapshot_brain_montage(fig,montage)
 xy_pts = np.vstack([xy[ch] for ch in raw.ch_names])
 xy_pts[:,1] = -xy[:,1] #just for plot issue
 

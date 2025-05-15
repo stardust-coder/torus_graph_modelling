@@ -29,3 +29,4 @@ def data_to_corr_map(data, metric,output_path="output/correlation.png"):
     plt.imshow(corr_list,cmap="jet")
     plt.colorbar()
     plt.savefig(output_path)
+    return corr_list
