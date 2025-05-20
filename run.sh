@@ -1,6 +1,6 @@
 #!/bin/bash
-nohup python script/run_paper_experiment.py -e 0 -p 3 -s 0 > 3-0.log &
-# nohup python script/run_paper_experiment.py -e 8 -p 3 -s 1 > 3-1.log &
+# nohup python script/run_paper_experiment.py -e 0 -p 3 -s 0 > 3-0.log &
+# nohup python script/run_paper_experiment.py -e 0 -p 3 -s 1 > 3-1.log &
 # nohup python script/run_paper_experiment.py -e 8 -p 3 -s 2 > 3-2.log &
 # nohup python script/run_paper_experiment.py -e 8 -p 3 -s 3 > 3-3.log &
 # nohup python script/run_paper_experiment.py -e 8 -p 6 -s 0 > 6-0.log &
