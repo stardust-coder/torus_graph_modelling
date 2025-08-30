@@ -422,21 +422,30 @@ class Torus_Graph_Model:
 
     def graph_property(self,abbr=True):
         if not abbr:
-            print("Average clustering coefficient = ", nx.average_clustering(self.G))
-            print("Average shortest path length = ", nx.average_shortest_path_length(self.G))
-            print("Edge number = ", len(self.G.edges))
+            ac = nx.average_clustering(self.G)
+            try:
+                asp = nx.average_shortest_path_length(self.G)
+            except:
+                asp = None
             C = nx.community.louvain_communities(self.G, seed=123) # assume high dimensional graph
-            print("Modularity = ",nx.community.modularity(self.G,C))
-            print("Small-world coefficient = ", nx.sigma(self.G)) #,nx.omega(self.G))
-            res = ",".join([str(x) for x in [len(self.G.edges),"{:.3f}".format(nx.community.modularity(self.G,C)),"{:.3f}".format(nx.average_clustering(self.G)),"{:.3f}".format(nx.average_shortest_path_length(self.G)),"{:.3f}".format(nx.sigma(self.G))]])
-            res = "(" + res + ")"
-            print(res)
+            modul = nx.community.modularity(self.G,C)
+            s = nx.sigma(self.G)
+            
+            print("Average clustering coefficient = ", ac)
+            print("Average shortest path length = ", asp)
+            print("Edge number = ", len(self.G.edges))
+            print("Modularity = ", modul)
+            print("Small-world coefficient = ", s) #,nx.omega(self.G))
         else:
             C = nx.community.louvain_communities(self.G, seed=123) # assume high dimensional graph
             res = ",".join([str(x) for x in [len(self.G.edges),"{:.3f}".format(nx.community.modularity(self.G,C)),"{:.3f}".format(nx.average_clustering(self.G)),"{:.3f}".format(nx.average_shortest_path_length(self.G))]])
             res = "(" + res + ")"
             print(res)
-
+    
+    def graph_property_min(self):
+        C = nx.community.louvain_communities(self.G, seed=123) # assume high dimensional graph
+        modul = nx.community.modularity(self.G,C)
+        return len(self.G.edges), modul
 
     def set_coordinates(self, arr):
         dic = {}

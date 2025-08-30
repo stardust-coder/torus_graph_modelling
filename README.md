@@ -1,6 +1,6 @@
-# Regularized Score Matching of Torus Graph Model for EEG Phase-connectivity Analysis
+# Sparse Torus Graph for Phase-based connectivity
 
-* Previous study (Klein et al.) : Fit torus graph to multivariate circular data and view test statistics under null hypothesis that two nodes are independent. 
+* Previous study (Klein et al., AoS2020) : Fit torus graph to multivariate circular data and view test statistics under null hypothesis that two nodes are independent. 
 
 * Ours : Regularized score matching of the torus graph model to obtain sparse solutions.
 
@@ -81,6 +81,18 @@ CV2() runs 3 dimensional naive estimation. ($2^3$ candidates)
 
 ```
 python script/crossvalidation.py
+```
+
+## Run permutation tests for uncertainty analysis
+```
+python script/permutation_test.py # random permutation on a simulation data, column-wise shuffle.
+python script/permutation_test_EEG.py # permutation test between two different conditions. assuming the network statisitcs are already obtained as output/HumanEEG/{alpha,beta,gamma}.tsv.
+```
+
+## Compare non-sparse torus graph (original, [Klein et al., 2020]) and sparse torus graph (ours)
+Note that modularity works for a weighted graph but the others do not.
+```
+python script/compare.py
 ```
 
 ## Visualize reconstucted graph

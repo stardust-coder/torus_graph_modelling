@@ -100,10 +100,10 @@ def star_shaped_rotational_sample(N):
     data_arr, acc = sample_from_torus_graph(N, 5, true_phi, False)
     return data_arr
 
-def bagraph_sample(N):
-    d = 61
+def bagraph_sample(N, d=61):
     m = 5
     G_ = nx.barabasi_albert_graph(d, m, seed=None, initial_graph=None)
+    
     true_phi = np.zeros((2*d*d,1))
 
     index_dictionary = {}
@@ -112,7 +112,7 @@ def bagraph_sample(N):
     
     for e in G_.edges:
         ind = index_dictionary[e]
-        true_phi[2*d+4*ind:2*d+4*ind+4] = 0.1
+        true_phi[2*d+4*ind:2*d+4*ind+4] = 0.3
     
     data_arr, acc = sample_from_torus_graph(N, d, true_phi, False)
     

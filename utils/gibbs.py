@@ -24,6 +24,7 @@ def gibbs_sample(phi,data,k):
     kappa = [np.sqrt(phi_1[2*j:2*j+1][0]**2 + phi_1[2*j+1:2*j+2][0]**2) for j in range(d)]
     mu = [np.arctan2(phi_1[2*j+1:2*j+2][0],phi_1[2*j:2*j+1][0]) for j in range(d)]
     
+    
     #k : 除去するインデックス。0-indexなので注意.
     x = data
     L = [kappa[k]]
@@ -63,26 +64,38 @@ def gibbs_sample(phi,data,k):
     by = sum([L[m]*sin(V[m]) for m in range(len(V))])
     A = (bx**2+by**2)**0.5
     Delta = np.arctan2(by,bx)
+    if A == 0:
+        A = 1e-8
 
-    loc = Delta
-    kappa = A
-    sample_size = 1
-    
-    sample = vonmises(loc=loc, kappa=kappa).rvs(sample_size)
+    sample_size = 1  
+    sample = vonmises(loc=Delta, kappa=A).rvs(sample_size)
     return sample.item()
 
 def gibbs_sampler(N):
     d = 19
     comb = list(itertools.combinations([i for i in range(1,d+1)],2))
-    selected_edges = []
-    #random vector for model parameters
+    
+    # #Erdos-Renyi Graph with prob p
+    # selected_edges = []
+    # phi = []
+    # for i in range(d):
+    #     phi.extend([0.0,0.0])
+    # for i in range(int(d*(d-1)/2)):
+    #     if random.random() < 0.1:
+    #         phi.extend([0.3,0.3,0.3,0.3])
+    #         selected_edges.append(comb[i])
+    #     else:
+    #         phi.extend([0,0,0,0])
+
+    #prespecified edge structure
+    
+    selected_edges = [(1, 4), (1, 11), (2, 3), (3, 4), (3, 6), (3, 9), (3, 13), (3, 19), (4, 8), (6, 11), (7, 11), (8, 15), (8, 16), (9, 15), (10, 18), (14, 17), (14, 18), (16, 17)]
     phi = []
     for i in range(d):
         phi.extend([0.0,0.0])
-    for i in range(int(d*(d-1)/2)):
-        if random.random() < 0.5:
-            phi.extend([0.3,0.3,0.0,0.0])
-            selected_edges.append(comb[i])
+    for j,k in comb:
+        if (j,k) in selected_edges:
+            phi.extend([0.3,0.3,0.3,0.3])
         else:
             phi.extend([0,0,0,0])
         
@@ -104,6 +117,8 @@ def gibbs_sampler(N):
             samples_gbs.append(copy.deepcopy(x))
 
     # return samples_rj, samples_gbs # for debug
+    print("True edges:")
+    print(selected_edges)
     return np.array(samples_gbs), selected_edges
 
 
