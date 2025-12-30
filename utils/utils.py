@@ -85,6 +85,7 @@ import matplotlib.pyplot as plt
 import itertools
 import numpy as np
 from script.constant import get_eeg_filenames, get_electrode_names
+
 def draw_heatmap(M,output_img_path="heatmap.png"): #visualize estimated values in heatmap
     M1 = M.param[:2*M.d].reshape(-1,2).T
     

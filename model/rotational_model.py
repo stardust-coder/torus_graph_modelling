@@ -274,7 +274,7 @@ class Torus_Graph_Model:
             print(self.param.T.tolist()[0])
 
         elif mode=="lasso" or mode=="glasso":
-            print(f"Running {mode} on full model...")
+            print(f"Running {mode} ...")
             d = self.d
             assert self.naive_est_flag != False
             

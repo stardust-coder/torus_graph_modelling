@@ -1,14 +1,8 @@
 import sys
 sys.path.append(".")
 
-use_cupy = False
-if use_cupy:
-    from model.full_model_cupy import Torus_Graph_Model
-    from model.rotational_model_cupy import Rotational_Model
-else:
-    from model.torus_graph_model import Torus_Graph_Model
-    from model.rotational_model import Rotational_Model
-    from model.cylinder_model import Cylinder_Graph_Model
+from model.torus_graph_model import Torus_Graph_Model
+from model.rotational_model import Rotational_Model
 
 from utils.simulation import sample_from_torus_graph, star_shaped_sample, star_shaped_rotational_sample, bagraph_sample
 from utils.gibbs import gibbs_sampler
@@ -41,24 +35,31 @@ def AV(data):
 #     errors.append(error)
 # import pdb; pdb.set_trace()
 
-###simulation
-# data_arr, true_edges = gibbs_sampler(25000)
-# data_arr = star_shaped_sample(1000)
-# data_arr = star_shaped_rotational_sample(1000)
+tmp_list = []
+for _ in range(1):
+    ###simulation
+    # data_arr, true_edges = gibbs_sampler(25000)
+    data_arr = star_shaped_sample(1000)
+    # data_arr = star_shaped_rotational_sample(1000)
 
-# # M = Rotational_Model(data_arr.shape[1])
-# M = Torus_Graph_Model(data_arr.shape[1])
+    M = Torus_Graph_Model(data_arr.shape[1])
+    # M = Rotational_Model(data_arr.shape[1])
 
-# M.estimate(data_arr,mode="naive")
-# print(M.param.T.tolist()[0])
-# # # M.estimate(data_arr,mode="lasso")
-# # # print(M.param.T.tolist()[0])
-# # # M.estimate(data_arr,mode="glasso")
-# # # print(M.param.T.tolist()[0])
-# M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(M.model_d-2*M.d)]
-# M.estimate(data_arr,mode="glasso")
-# print(M.param.T.tolist()[0])
+    M.estimate(data_arr,mode="naive")
+    print(M.param.T.tolist()[0])
+    # # M.estimate(data_arr,mode="lasso")
+    # # print(M.param.T.tolist()[0])
+    # # M.estimate(data_arr,mode="glasso")
+    # # print(M.param.T.tolist()[0])
+    M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(M.model_d-2*M.d)]
+    M.lambda_list = np.linspace(0, 2, num=100).tolist()
+    M.estimate(data_arr,mode="glasso")
+    print(M.param.T.tolist()[0])
 
+    tmp = len(M.reg_path[M.smic.index(min(M.smic))])
+    tmp_list.append(tmp)
+    print("Minimum SMIC Edge Num:", tmp)
+import pdb; pdb.set_trace()
 
 #Main codes
 exp_id = 0

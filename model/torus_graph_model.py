@@ -368,6 +368,7 @@ class Torus_Graph_Model:
                 eigvals = scipy.linalg.eigh(I_full[np.ix_(ind_,ind_)],self.Gamma_hat[np.ix_(ind_,ind_)],eigvals_only=True)
                 smic2 = sum(eigvals) ### tr(IJ^-1)
                 smic = smic1 + smic2 * 2
+                print("SMICの内訳",smic1, smic2*2)
                 return smic
 
             # scores = [calc_SMIC(j) for j in range(len(lambda_list))] # no use of joblib. 
@@ -389,12 +390,14 @@ class Torus_Graph_Model:
                     print(r_new)
                     r_prev = r_new
             
-            plt.figure(figsize=(10,10))
-            plt.plot([len(x) for x in edge_list],scores, "-o")
-            while os.path.isfile(img_path) == True:
-                img_path = img_path.replace(".png","") + "_" + ".png"
-            plt.savefig(img_path)
-            plt.clf()
+            save_fig = True
+            if save_fig:
+                plt.figure(figsize=(10,10))
+                plt.plot([len(x) for x in edge_list],scores, "-o")
+                while os.path.isfile(img_path) == True:
+                    img_path = img_path.replace(".png","") + "_" + ".png"
+                plt.savefig(img_path)
+                plt.clf()
             
             ### Save results to model
             self.smic = scores

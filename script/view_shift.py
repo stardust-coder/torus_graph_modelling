@@ -6,7 +6,7 @@ df = pd.read_csv("/home/sukeda/torus_graph_modelling/output/61dim_25000data_rota
 print(df)
 
 drowsy = [3,6,7,8,10,14,26]
-responsive = [2,5,9,13,18,20,22,23,24,27,28,29]
+responsive = [2,5,9,13,18,20,22,23,24,25,27,28,29]
 states = ["baseline","mild","moderate","recovery"]
 measures = ["#edge", "modularity", "average clustering", "average shortest path length","small-world coefficient","pseudo small-world"]
 measure = 3

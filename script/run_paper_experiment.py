@@ -11,9 +11,11 @@ from constant import get_eeg_filenames, get_electrode_names
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+from copy import deepcopy
 
-def save(model,output_path):
-    model.Gamma_hat =  None
+def save(M,output_path):
+    model = deepcopy(M)
+    model.Gamma_hat = None
     model.H_hat = None
     model.D_list = None
     model.H_list = None
@@ -36,16 +38,14 @@ def run_eeg(exp_id,patient_id,patient_state_id):
     _ = correlation.data_to_corr_map(data_arr,utils.PLI,f"output/{out_id}_PLI.png")
     plt.clf()
 
-    # M = Torus_Graph_Model(5)
-    M = Rotational_Model(61)
+    M = Torus_Graph_Model(61)
+    # M = Rotational_Model(61)
 
     ###Naive
     M.estimate(data_arr,mode="naive")
-    # import pdb; pdb.set_trace()
-    # save(M,output_path=f"output/{out_id}_naive.pkl")
-
-    utils.draw_heatmap(M,output_img_path=f"output/{out_id}_naive_heatmap.png")
-    M.graph_property(abbr=True)
+    save(M,output_path=f"output/{out_id}_naive.pkl")
+    # utils.draw_heatmap(M,output_img_path=f"output/{out_id}_naive_heatmap.png")
+    # M.graph_property(abbr=True)
 
     ###GroupLASSO with repeat lambda
     M.lambda_list = [0] + np.logspace(-3,0.5, num=99).tolist()
@@ -56,8 +56,8 @@ def run_eeg(exp_id,patient_id,patient_state_id):
         if opt_index == 0 or opt_index == len(M.lambda_list)-1:
             break
         M.lambda_list = np.linspace(M.lambda_list[opt_index-1],M.lambda_list[opt_index+1],10)
-    utils.draw_heatmap(M,output_img_path=f"output/{out_id}_glasso_heatmap.png")
-    M.graph_property(abbr=True)
+    # utils.draw_heatmap(M,output_img_path=f"output/{out_id}_glasso_heatmap.png")
+    # M.graph_property(abbr=True)
     save(M,output_path=f"output/{out_id}_glasso_model.pkl")
 
     print("=" * 30)
@@ -88,8 +88,7 @@ def run_ecog():
     M.graph_property(abbr=True)
 
     ###GroupLASSO with repeat lambda
-    M.lambda_list = [0] + np.logspace(-3,0.5, num=99).tolist()
-    # M.lambda_list = [0.001 * j for j in range(100)]    
+    M.lambda_list = [0] + np.logspace(-3,0.5, num=99).tolist()   
     M.glasso_weight = [0 for _ in range(2*M.d)] + [1 for _ in range(2*M.d*M.d-2*M.d)]
     for _ in range(1):
         M.estimate(data_arr,mode="glasso",img_path=f"output/{out_id}_glasso.png")
