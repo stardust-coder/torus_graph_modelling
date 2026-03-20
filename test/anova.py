@@ -249,18 +249,14 @@ def _fit_ols(X, y):
 
 def lrt_anova_two_way_repeated(df, y_col, group_col, state_col, subject_col):
     """
-    Two-way mixed-design (group × state) について、
-    和の制約付きパラメータ化を使った線形モデルによる LRT を行う。
+    Two-way mixed-design ANOVA (group × state) with subject fixed effects.
+    Model corresponds exactly to:
 
-    制約:
-        Σ_g α_g = 0
-        Σ_s β_s = 0
-        Σ_i (αβ)_{ij} = 0
-        Σ_j (αβ)_{ij} = 0
-        各 group ごとに Σ_subj γ_{g,subj} = 0
+        y_is = μ + α_g + β_s + (αβ)_{gs} + γ_i + ε_is
 
-    ここでは subject 効果を「固定効果として」入れた上で、
-    group, state, group×state の効果に対して尤度比検定を行う。
+    with sum-to-zero constraints on α, β, (αβ), and γ (within group).
+
+    LRTs are performed with properly nested models.
     """
 
     dfw = df.copy()
@@ -271,42 +267,46 @@ def lrt_anova_two_way_repeated(df, y_col, group_col, state_col, subject_col):
         subject_col: "subject"
     })
 
-    dfw["group"] = dfw["group"].astype("category")
-    dfw["state"] = dfw["state"].astype("category")
-    dfw["subject"] = dfw["subject"].astype("category")
+    for c in ["group", "state", "subject"]:
+        dfw[c] = dfw[c].astype("category")
 
     y = dfw["y"].to_numpy(dtype=float)
     results = []
 
     # -------------------------------------------------------
-    # FULL MODEL : y ~ group * state + subject-within-group
+    # FULL MODEL (with interaction)
+    # y ~ group + state + group:state + subject(group)
     # -------------------------------------------------------
-    X_full, X_full_names = _build_design_matrix(
+    X_full_int, _ = _build_design_matrix(
         dfw,
         include_group=True,
         include_state=True,
         include_inter=True
     )
-    full = _fit_ols(X_full, y)
-    ll_full = full["ll"]
-    df_full = full["df_model"]
-    # import pdb; pdb.set_trace()
+    fit_full_int = _fit_ols(X_full_int, y)
+    ll_full_int = fit_full_int["ll"]
+    rank_full_int = np.linalg.matrix_rank(X_full_int)
 
     # -------------------------------------------------------
-    # 1) TEST INTERACTION : drop group:state
+    # FULL MODEL (main effects only)
+    # y ~ group + state + subject(group)
     # -------------------------------------------------------
-    X_no_inter, _ = _build_design_matrix(
+    X_full_main, _ = _build_design_matrix(
         dfw,
         include_group=True,
         include_state=True,
         include_inter=False
     )
-    no_inter = _fit_ols(X_no_inter, y)
-    ll_no_inter = no_inter["ll"]
-    df_no_inter = no_inter["df_model"]
+    fit_full_main = _fit_ols(X_full_main, y)
+    ll_full_main = fit_full_main["ll"]
+    rank_full_main = np.linalg.matrix_rank(X_full_main)
 
-    LR_inter = 2 * (ll_full - ll_no_inter)
-    df_inter = df_full - df_no_inter
+    # -------------------------------------------------------
+    # 1) INTERACTION TEST
+    # H0: (αβ)_{gs} = 0
+    # -------------------------------------------------------
+    LR_inter = 2 * (ll_full_int - ll_full_main)
+    df_inter = rank_full_int - rank_full_main
     p_inter = chi2.sf(LR_inter, df_inter)
 
     results.append({
@@ -314,15 +314,13 @@ def lrt_anova_two_way_repeated(df, y_col, group_col, state_col, subject_col):
         "LR": LR_inter,
         "df": df_inter,
         "p_value": p_inter,
-        "ll_full": ll_full,
-        "ll_reduced": ll_no_inter
+        "ll_full": ll_full_int,
+        "ll_reduced": ll_full_main
     })
 
-    # import pdb; pdb.set_trace()
     # -------------------------------------------------------
-    # 2) TEST GROUP : drop group （subject-within-group は残す）
-    #    full と reduced でどちらも interaction を含まないようにして、
-    #    「group 主効果の有無」の比較にする。
+    # 2) GROUP MAIN EFFECT TEST
+    # H0: α_g = 0
     # -------------------------------------------------------
     X_no_group, _ = _build_design_matrix(
         dfw,
@@ -330,12 +328,12 @@ def lrt_anova_two_way_repeated(df, y_col, group_col, state_col, subject_col):
         include_state=True,
         include_inter=False
     )
-    no_group = _fit_ols(X_no_group, y)
-    ll_no_group = no_group["ll"]
-    df_no_group = no_group["df_model"]
+    fit_no_group = _fit_ols(X_no_group, y)
+    ll_no_group = fit_no_group["ll"]
+    rank_no_group = np.linalg.matrix_rank(X_no_group)
 
-    LR_group = 2 * (ll_full - ll_no_group)
-    df_group = df_full - df_no_group
+    LR_group = 2 * (ll_full_main - ll_no_group)
+    df_group = rank_full_main - rank_no_group
     p_group = chi2.sf(LR_group, df_group)
 
     results.append({
@@ -343,15 +341,13 @@ def lrt_anova_two_way_repeated(df, y_col, group_col, state_col, subject_col):
         "LR": LR_group,
         "df": df_group,
         "p_value": p_group,
-        "ll_full": ll_full,
+        "ll_full": ll_full_main,
         "ll_reduced": ll_no_group
     })
 
-    # import pdb; pdb.set_trace()
-
     # -------------------------------------------------------
-    # 3) TEST STATE : drop state
-    #    （group, subject-within-group は残す）
+    # 3) STATE MAIN EFFECT TEST
+    # H0: β_s = 0
     # -------------------------------------------------------
     X_no_state, _ = _build_design_matrix(
         dfw,
@@ -359,13 +355,12 @@ def lrt_anova_two_way_repeated(df, y_col, group_col, state_col, subject_col):
         include_state=False,
         include_inter=False
     )
-    
-    no_state = _fit_ols(X_no_state, y)
-    ll_no_state = no_state["ll"]
-    df_no_state = no_state["df_model"]
+    fit_no_state = _fit_ols(X_no_state, y)
+    ll_no_state = fit_no_state["ll"]
+    rank_no_state = np.linalg.matrix_rank(X_no_state)
 
-    LR_state = 2 * (ll_full - ll_no_state)
-    df_state = df_full - df_no_state
+    LR_state = 2 * (ll_full_main - ll_no_state)
+    df_state = rank_full_main - rank_no_state
     p_state = chi2.sf(LR_state, df_state)
 
     results.append({
@@ -373,16 +368,13 @@ def lrt_anova_two_way_repeated(df, y_col, group_col, state_col, subject_col):
         "LR": LR_state,
         "df": df_state,
         "p_value": p_state,
-        "ll_full": ll_full,
+        "ll_full": ll_full_main,
         "ll_reduced": ll_no_state
     })
-
-    # import pdb; pdb.set_trace()
-
+    import pdb; pdb.set_trace()
     return pd.DataFrame(results).set_index("effect")
 
-
-df_long = load_df("/home/sukeda/torus_graph_modelling/output/HumanEEG/alpha.tsv")
+df_long = load_df("/home/sukeda/torus_graph_modelling/output/HumanEEG/gamma.tsv")
 latex = []
 for i in range(1,5):
     anova_vi = lrt_anova_two_way_repeated(
@@ -392,7 +384,9 @@ for i in range(1,5):
         state_col="state",
         subject_col="patient_ID"
     )
-    latex.append(anova_vi["p_value"].tolist())
+    # latex.append(anova_vi["p_value"].tolist())
+    latex.append([min(1,12*x) for x in anova_vi["p_value"].tolist()]) #Bonferroni correction
+
     print(anova_vi)
 
 print(numpy_to_latex_table(np.array(latex).T))
