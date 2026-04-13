@@ -1,6 +1,12 @@
 # Sparse Torus Graph for Phase-based connectivity
 
-* Previous study (Klein et al., AoS2020) : Fit torus graph to multivariate circular data and view test statistics under null hypothesis that two nodes are independent. 
+
+## News
+- 🔥 2026.2 Our paper was accepted to Neural Computation!
+
+
+## Summary
+* Previous study ([Klein et al., AoS2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full)) : Fit torus graph to multivariate circular data and view test statistics under null hypothesis that two nodes are independent. 
 
 * Ours : Regularized score matching of the torus graph model to obtain sparse solutions.
 
