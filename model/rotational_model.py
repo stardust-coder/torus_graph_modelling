@@ -332,40 +332,63 @@ class Torus_Graph_Model:
             I_concat = np.empty((self.model_d,n))
             for j in tqdm(range(n)):
                 I_concat[:,j:j+1] = ((self.D_list[j])@(self.D_list[j].T @ self.naive_est) - self.H_list[j])/(n**0.5)
-            I_full = I_concat@I_concat.T
+            # I_full = I_concat@I_concat.T
 
             def calc_SMIC(j):
-                est_arr = self.naive_est
+                """
+                SMIC for the j-th candidate model on the regularization path.
+                This implementation:
+                extracts the active index set S = ind_
+                refits the unpenalized score-matching estimator on S
+                computes
+                    SMIC = n * d_hat(theta_S) + tr(I_S J_S^{-1})
+                    where
+                    d_hat(theta) = 0.5 * theta^T Gamma_hat theta - theta^T H_hat
+                    J_S = Gamma_hat[S,S]
+                    I_S = (1/n) sum_t r_t r_t^T
+                    r_t = Gamma_t[S,S] theta_S - H_t[S]
+                """
                 ind_ = model_to_indices(binarr_list[j].flatten().tolist())
-
-                ### Naive summation, very slow
-                # N = n
-                # I = np.zeros((len(ind_),len(ind_)))
-                # Gamma_hat = np.zeros((len(ind_),len(ind_)))
-                # H_hat = np.zeros((len(ind_), 1))
-                # for j in range(N): #TODO: accelerate
-                #     x = data[j]
-                #     G_ = Gamma(x)[np.ix_(ind_,ind_)]
-                #     Gamma_hat = Gamma_hat + G_
-                #     H_ = H(x)[ind_]
-                #     H_hat = H_hat + H_
-                #     tmp = G_ @ est_arr[ind_] - H_
-                # #     I = I + tmp @ tmp.T
-                # Gamma_hat = Gamma_hat/N
-                # H_hat = H_hat/N
-                # I = I / N
-                # smic1 = N*(-est_arr[ind_].T@H_hat) 
-                # smic1 = smic1.item()
-
-                ### Matrix multiplication, very fast
-                smic1 = n*(-est_arr[ind_].T@self.H_hat[ind_]) 
-                smic1 = smic1.item()    
-                eigvals = scipy.linalg.eigh(I_full[np.ix_(ind_,ind_)],self.Gamma_hat[np.ix_(ind_,ind_)],eigvals_only=True)
-                smic2 = sum(eigvals) ### tr(IJ^-1)
-                smic = smic1 + smic2 * 2
-                
-                print("SMICの内訳",smic1, smic2*2)
-                return smic
+                # 念のため。空モデルが起きるなら、その扱いを明示する
+                if len(ind_) == 0:
+                    # 定数項 c を持っていないので、比較用には 0 + 0 と置く
+                    # もし理論的に空モデルも厳密に評価したいなら、定数項も別途保持してください
+                    return 0.0
+                # 部分系を取り出す
+                Gamma_SS = self.Gamma_hat[np.ix_(ind_, ind_)]
+                H_S = self.H_hat[ind_]
+                # 無罰則で再推定: Gamma_SS * theta_S = H_S
+                # 逆行列は作らず solve を使う
+                try:
+                    theta_S = np.linalg.solve(Gamma_SS, H_S)
+                except np.linalg.LinAlgError:
+                    # 特異・ほぼ特異なら擬似逆
+                    theta_S = np.linalg.pinv(Gamma_SS) @ H_S
+                # 第1項: n * d_hat(theta_S)
+                # d_hat(theta) = 0.5 * theta^T Gamma_hat theta - theta^T H_hat
+                # Gamma_SS theta_S = H_S より d_hat(theta_S) = -0.5 * theta_S^T H_S
+                smic1 = (-0.5 * n * (theta_S.T @ H_S)).item()
+                # 第2項: tr(I_S J_S^{-1})
+                # r_t = Gamma_t[S,S] theta_S - H_t[S]
+                # ただし Gamma_t = D_t D_t^T なので、Gamma_t[S,S] theta_S = D_S (D_S^T theta_S)
+                I_S = np.zeros((len(ind_), len(ind_)))
+                for t in range(n):
+                    D_S = self.D_list[t][ind_, :]      # shape: |S| x d
+                    H_t_S = self.H_list[t][ind_]       # shape: |S| x 1
+                    r_t = D_S @ (D_S.T @ theta_S) - H_t_S
+                    I_S += r_t @ r_t.T
+                I_S /= n
+                # trace(I_S @ Gamma_SS^{-1}) を安定に計算
+                # 明示的な逆行列は避ける
+                try:
+                    X = np.linalg.solve(Gamma_SS, I_S)
+                except np.linalg.LinAlgError:
+                    X = np.linalg.pinv(Gamma_SS) @ I_S
+                smic2 = np.trace(X).item()
+                smic = smic1 + smic2
+                smic *= 2 #see supplement
+                print("SMIC breakdown:", smic1, smic2)
+                return smic 
 
             # scores = [calc_SMIC(j) for j in range(len(lambda_list))] # no use of joblib. 
             scores = Parallel(n_jobs=-1)(delayed(calc_SMIC)(j) for j in range(len(lambda_list))) #use joblib.

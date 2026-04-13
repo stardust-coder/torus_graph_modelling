@@ -2,11 +2,11 @@
 
 
 ## News
-- 🔥 2026.2 Our paper was accepted to Neural Computation!
+- 2026.4 Added `supplement`. 
 
 
 ## Summary
-* Previous study ([Klein et al., AoS2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full)) : Fit torus graph to multivariate circular data and view test statistics under null hypothesis that two nodes are independent. 
+* Previous study ([Klein et al., AoAS2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full)) : Fit torus graph to multivariate circular data and view test statistics under null hypothesis that two nodes are independent. 
 
 * Ours : Regularized score matching of the torus graph model to obtain sparse solutions.
 
@@ -118,9 +118,3 @@ python script/view_graph.py
 This repository is partly a reimplementation of [Klein et al, 2020](https://projecteuclid.org/journals/annals-of-applied-statistics/volume-14/issue-2/Torus-graphs-for-multivariate-phase-coupling-analysis/10.1214/19-AOAS1300.full).
 
 We thank the developers of the EEG dataset we used [Chennu et al., 2016](https://www.repository.cam.ac.uk/items/b7817912-50b5-423b-882e-978fb39a49df).
-
-
-## How to cite
-```
-coming soon...
-```
