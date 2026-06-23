@@ -1,8 +1,25 @@
-# Sparse Torus Graph for Phase-based connectivity
-
+# Sparse graphical modeling for electrophysiological phase-based connectivity using circular statistics
 
 ## News
+- 2026.7 Published in **Neural Computation** 🎊
 - 2026.4 Added `supplement`. 
+
+## How to cite
+
+[Paper](https://direct.mit.edu/neco/article/38/7/1135/136967/Sparse-Graphical-Modeling-for-Electrophysiological)
+
+```
+@article{sukeda2026sparse,
+  title={Sparse graphical modeling for electrophysiological phase-based connectivity using circular statistics},
+  author={Sukeda, Issey and Matsuda, Takeru},
+  journal={Neural Computation},
+  volume={38},
+  number={7},
+  pages={1135--1179},
+  year={2026},
+  publisher={MIT Press 255 Main Street, 9th Floor, Cambridge, Massachusetts 02142, USA~…}
+}
+```
 
 
 ## Summary
